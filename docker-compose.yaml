@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    env_file:
+      - .env
+    command: sh -c "python manage.py migrate && gunicorn --bind 0.0.0.0:8000 Ari.wsgi:application"
+    volumes:
+      - .:/Ari
+      - static_volume:/Ari/staticfiles
+      - media_volume:/Ari/mediafiles
+    ports:
+      - "8020:8000"
+    depends_on:
+      ari_db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: always
+
+  ari_db:
+    image: postgis/postgis:latest
+    environment:
+      POSTGRES_DB: ari_app
+      POSTGRES_USER: postgres_user
+      POSTGRES_PASSWORD: postgres_password
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres_user -d ari_app"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6371:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+  redis_data:
