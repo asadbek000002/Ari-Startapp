@@ -16,7 +16,7 @@ class ShopRole(models.Model):
     name = models.CharField(max_length=50, unique=True)
 
     def __str__(self):
-        return self.name
+        return self.name if self.name else "Noma'lum"
 
 
 # Create your models here.
@@ -51,7 +51,7 @@ class Shop(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.title
+        return self.title if self.title else "Noma'lum"
 
 
 # Dokon savdosi haqida atchot
@@ -61,7 +61,7 @@ class Sale(models.Model):
     date = models.DateTimeField(auto_now_add=True)  # Qachon bo‘lgani
 
     def __str__(self):
-        return self.shop.name
+        return self.shop.name if self.shop.name else "Noma'lum"
 
 
 # Home page reklama modeli
@@ -74,4 +74,4 @@ class Advertising(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.title
+        return self.title if self.title else "Noma'lum"
