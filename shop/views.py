@@ -80,10 +80,10 @@ def shop_map_list(request):
             )
             .annotate(distance=Distance("coordinates", user_location.coordinates))  # Masofa hisoblash
             .order_by("distance")  # Masofa bo‘yicha saralash
-            .only("id", "title", "image", "locations", "coordinates", "is_active")  # Ortiqcha ma'lumot yuklamaslik
+            .only("id", "title", "image", "locations", "coordinates", "title", "is_active")  # Ortiqcha ma'lumot yuklamaslik
         )
     else:
-        shops = Shop.objects.filter(is_verified=True).order_by("order", "-created_at")[:100]  # Limit qo‘shildi
+        shops = Shop.objects.filter(is_verified=True).order_by("order", "-created_at")[:300]  # Limit qo‘shildi
 
     serializer = ShopMapListSerializer(shops, many=True, context={"request": request})
     return Response(serializer.data)

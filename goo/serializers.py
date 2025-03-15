@@ -70,7 +70,7 @@ class GooRegistrationSerializer(serializers.Serializer):
 class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
-        fields = ['id', 'custom_name', 'address', 'coordinates', 'created_at']
+        fields = ['id', 'custom_name', 'address', 'coordinates', 'created_at', "active"]
         read_only_fields = ['created_at', 'address']
 
     def create(self, validated_data):

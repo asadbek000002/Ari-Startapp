@@ -90,3 +90,12 @@ class Location(models.Model):
 
     def __str__(self):
         return f"{self.user.phone_number} -  {self.address}"
+
+    def save(self, *args, **kwargs):
+        # Foydalanuvchi har qanday locationni update qilganda u avtomatik True bo'ladi
+        self.active = True
+
+        # Foydalanuvchining barcha boshqa locationlarini False qilish
+        Location.objects.filter(user=self.user).exclude(id=self.id).update(active=False)
+
+        super().save(*args, **kwargs)

@@ -38,12 +38,26 @@ class LocationCreateView(generics.CreateAPIView):
         serializer.save(user=self.request.user)
 
 
-class LocationListView(generics.ListAPIView):
-    serializer_class = LocationSerializer
-    permission_classes = [IsAuthenticated]
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_locations(request):
+    user = request.user
+    locations = Location.objects.filter(user=user)
+    locations = locations.order_by('-active', '-created_at')
+    serializer = LocationSerializer(locations, many=True)
 
-    def get_queryset(self):
-        return Location.objects.filter(user=self.request.user)
+    return Response(serializer.data)
+
+# aynan bitta locationni active qilish
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_active_location(request, location_id):
+    user = request.user
+    location = get_object_or_404(Location, id=location_id, user=user)
+
+    location.save()  # Avtomatik active=True bo‘ladi va boshqalar False bo‘ladi
+
+    return Response({"message": "Location active qilindi", "active_location_id": location.id})
 
 
 # goo da zakazchik zakaz berish uchun mahsulatlarga
@@ -52,7 +66,8 @@ class LocationListView(generics.ListAPIView):
 @permission_classes([IsAuthenticated])
 def create_order(request, shop_id):
     """Do‘kon ID bo‘yicha zakaz yaratish"""
-    serializer = OrderSerializer(data=request.data, context={"request": request, "shop_id": shop_id})  # shop_id'ni qo‘shdik
+    serializer = OrderSerializer(data=request.data,
+                                 context={"request": request, "shop_id": shop_id})  # shop_id'ni qo‘shdik
 
     if serializer.is_valid():
         order = serializer.save()

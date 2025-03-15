@@ -172,10 +172,10 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200 MB
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # CORS Ruxsatlar
-CORS_ALLOWED_ORIGINS = [
-    "https://ari.uzfati.uz",
-    "http://ari.uzfati.uz",
-]
+# CORS_ALLOWED_ORIGINS = [
+#     "https://ari.uzfati.uz",
+#     "http://ari.uzfati.uz",
+# ]
 
 # Agar barcha domenlarga ruxsat berish kerak bo‘lsa:
 # CORS_ALLOW_ALL_ORIGINS = True  # Tavsiya etilmaydi
@@ -185,8 +185,8 @@ CORS_ALLOWED_ORIGINS = [
 
 # CSRF sozlamalari
 CSRF_TRUSTED_ORIGINS = [
-    "https://ari.uzfati.uz",
-    "http://ari.uzfati.uz",
+    "http://warehouse.bekzodbek-dev.uz",
+    "https://warehouse.bekzodbek-dev.uz",
 ]
 
 CSRF_COOKIE_SECURE = True  # HTTPS orqali xavfsiz cookie'larni ishlatish

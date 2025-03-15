@@ -17,7 +17,7 @@ class ShopListSerializer(serializers.ModelSerializer):
 class ShopMapListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
-        fields = ["id", "image", "coordinates", "locations", "is_active"]
+        fields = ["id", "image", "coordinates", "locations", "title", "is_active"]
 
 
 class ShopDetailSerializer(serializers.ModelSerializer):
