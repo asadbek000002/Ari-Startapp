@@ -15,9 +15,15 @@ class ShopAdminForm(forms.ModelForm):
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
     form = ShopAdminForm
-    list_display = ("title", "role", "is_active", "is_verified")
-    search_fields = ("phone_number", "title")
+    list_display = ("title_uz", "title_ru", "role", "is_active", "is_verified")  # Faqat tarjima qilingan maydonlar
+    search_fields = ("phone_number", "title_uz", "title_ru")
     list_filter = ("role", "is_verified")
+
+    # fieldsets = (
+    #     (None, {
+    #         'fields': ('title_uz', 'title_ru', 'role', 'is_active', 'is_verified', 'phone_number')
+    #     }),
+    # )
 
 
 @admin.register(ShopRole)

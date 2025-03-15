@@ -28,7 +28,7 @@ def global_search(request):
     serializer = ShopFeaturedSerializer(shops, many=True, context={"request": request})
 
     # Faqat title va locations maydonlarini qaytarish
-    filtered_data = [{"title": shop["title"], "locations": shop["locations"], "role": shop["role_name"]} for shop in
+    filtered_data = [{"title": shop["title"], "locations": shop["locations"], "role": shop["role"]} for shop in
                      serializer.data]
 
     return Response(filtered_data)
@@ -52,7 +52,7 @@ def shop_featured_list(request):
     roles = ShopRole.objects.all()
     shops = Shop.objects.filter(is_verified=True).select_related("role").order_by("order")
 
-    role_data = {role.id: {"role_id": role.id, "role_name": role.name, "shops": []} for role in roles}
+    role_data = {role.id: {"role_id": role.id, "role": role.name, "shops": []} for role in roles}
 
     for shop in shops:
         role = shop.role  # ForeignKey bo‘lsa `.all()` kerak emas
