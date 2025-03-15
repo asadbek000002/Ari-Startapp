@@ -21,7 +21,7 @@ class ShopRole(models.Model):
 
 # Create your models here.
 class Shop(models.Model):
-    roles = models.ForeignKey(ShopRole, on_delete=models.SET_NULL, related_name="users", null=True, blank=True)
+    role = models.ForeignKey(ShopRole, on_delete=models.SET_NULL, related_name="users", null=True, blank=True)
     image = models.ImageField(upload_to=image_name, blank=True, null=True)
     title = models.CharField(max_length=55, null=True, blank=True)
     phone_number = models.CharField(max_length=13, null=True, blank=True)

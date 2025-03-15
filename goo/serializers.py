@@ -101,6 +101,20 @@ class LocationSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class LocationUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Location
+        fields = ['id', 'custom_name', 'address', 'coordinates', 'active']
+        read_only_fields = ['id']
+
+    def update(self, instance, validated_data):
+        # Agar foydalanuvchi maydonlarni yangilasa, shular yangilanadi
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
 class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order

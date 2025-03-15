@@ -15,9 +15,9 @@ class ShopAdminForm(forms.ModelForm):
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
     form = ShopAdminForm
-    list_display = ("title", "roles", "is_active", "is_verified")
+    list_display = ("title", "role", "is_active", "is_verified")
     search_fields = ("phone_number", "title")
-    list_filter = ("roles", "is_verified")
+    list_filter = ("role", "is_verified")
 
 
 @admin.register(ShopRole)

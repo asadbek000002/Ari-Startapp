@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
-from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer
+from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer
 from shop.models import Shop
 from user.models import Location
 
@@ -48,16 +48,31 @@ def list_locations(request):
 
     return Response(serializer.data)
 
-# aynan bitta locationni active qilish
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def set_active_location(request, location_id):
+def update_location(request, location_id):
     user = request.user
     location = get_object_or_404(Location, id=location_id, user=user)
 
-    location.save()  # Avtomatik active=True bo‘ladi va boshqalar False bo‘ladi
+    serializer = LocationUpdateSerializer(location, data=request.data, partial=True)  # Qisman yangilash
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
 
-    return Response({"message": "Location active qilindi", "active_location_id": location.id})
+    return Response({
+        "message": "Location yangilandi va active qilindi",
+        "updated_location": serializer.data
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def detail_location(request, location_id):
+    user = request.user
+    location = get_object_or_404(Location, id=location_id, user=user)
+
+    serializer = LocationUpdateSerializer(location)
+    return Response(serializer.data)
 
 
 # goo da zakazchik zakaz berish uchun mahsulatlarga
