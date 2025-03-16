@@ -1,11 +1,15 @@
 from django.shortcuts import render, get_object_or_404
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import RetrieveAPIView, UpdateAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
-from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer
+
+from goo.models import Contact
+from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
+    LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer
 from shop.models import Shop
 from user.models import Location
 
@@ -73,6 +77,41 @@ def detail_location(request, location_id):
 
     serializer = LocationUpdateSerializer(location)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def active_location(request):
+    user = request.user
+    location = Location.objects.filter(active=True, user=user).order_by(
+        "-created_at").first()
+
+    serializer = LocationActiveSerializer(location)
+    return Response(serializer.data)
+
+
+class UserProfileView(RetrieveAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return User.objects.only('id', 'phone_number', 'full_name', 'avatar', 'rating').get(pk=self.request.user.pk)
+
+
+class UpdateUserView(UpdateAPIView):
+    serializer_class = UserUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return User.objects.only('id', 'phone_number', 'full_name', 'avatar').get(pk=self.request.user.pk)
+
+
+class LatestContactView(RetrieveAPIView):
+    serializer_class = ContactSerializer
+    permission_classes = [IsAuthenticated]  # Agar autentifikatsiya kerak bo'lsa, IsAuthenticated qo'ying
+
+    def get_object(self):
+        return Contact.objects.latest('id')  # Eng oxirgi qo‘shilgan ma’lumotni olish
 
 
 # goo da zakazchik zakaz berish uchun mahsulatlarga

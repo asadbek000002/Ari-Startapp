@@ -4,6 +4,7 @@ from shop.views import shop_featured_list, shop_list_by_role, shop_map_list, sho
 urlpatterns = [
     # List
     path('global-search/', global_search, name='shop-featured-list'),
+
     path('shop-role-list/', shop_role_list, name='shop-role-list'),
     path('shop-featured-list/', shop_featured_list, name='shop-featured-list'),
     path('shop-list/<int:role_id>/', shop_list_by_role, name='shop-list'),

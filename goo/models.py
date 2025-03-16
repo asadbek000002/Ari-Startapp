@@ -15,7 +15,7 @@ class Product(models.Model):
         return self.percentages.split(", ") if self.percentages else []
 
     def __str__(self):
-        return self.name
+        return self.name if self.name else "Noma'lum"
 
 
 # dokonga zakaz berish
@@ -39,3 +39,11 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order {self.id} - {self.shop.title} - {self.user.phone_number}"
+
+
+class Contact(models.Model):
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
+    telegram_link = models.URLField(null=True, blank=True)
+
+    def __str__(self):
+        return self.phone_number if self.phone_number else "Noma'lum"

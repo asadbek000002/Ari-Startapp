@@ -4,7 +4,7 @@ from rest_framework import serializers
 from django.contrib.gis.measure import D
 from geopy.geocoders import Nominatim
 
-from goo.models import Order
+from goo.models import Order, Contact
 from shop.models import Shop
 from user.models import UserRole, VerificationCode, Location
 from django.contrib.auth import get_user_model
@@ -113,6 +113,35 @@ class LocationUpdateSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+class LocationActiveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Location
+        fields = ['custom_name', 'address']
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['phone_number', 'full_name', 'avatar']  # Faqat update bo‘ladigan maydonlar
+        extra_kwargs = {
+            'phone_number': {'required': False},
+            'full_name': {'required': False},
+            'avatar': {'required': False}
+        }
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['phone_number', 'full_name', 'avatar']
+
+
+class ContactSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contact
+        fields = ['phone_number', 'telegram_link']
 
 
 class OrderSerializer(serializers.ModelSerializer):

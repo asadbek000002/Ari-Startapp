@@ -84,7 +84,8 @@ def shop_map_list(request, role_id):
     """Foydalanuvchining joylashuvi bo‘yicha radiusni o‘zi belgilab do‘konlarni filterlaydigan API"""
 
     user = request.user
-    user_location = Location.objects.filter(user=user, active=True).order_by("-created_at").first()  # Eng so‘nggi joylashuv
+    user_location = Location.objects.filter(user=user, active=True).order_by(
+        "-created_at").first()  # Eng so‘nggi joylashuv
 
     # Radiusni olish (default=10 km, min=1 km, max=50 km)
     try:
