@@ -98,6 +98,12 @@ DATABASES = {
     }
 }
 
+# # Redis-ni broker sifatida belgilash
+CELERY_BROKER_URL = "redis://redis:6379/0"  # dokcer
+# # Backend natijalarini saqlash uchun Redis
+CELERY_RESULT_BACKEND = "redis://redis:6379/0"
+
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.contrib.gis.db.backends.postgis',
@@ -108,6 +114,11 @@ DATABASES = {
 #         'PORT': 5432,
 #     }
 # }
+#
+# # Redis-ni broker sifatida belgilash
+# CELERY_BROKER_URL = 'redis://localhost:6377/0'  # Local
+# # Backend natijalarini saqlash uchun Redis
+# CELERY_RESULT_BACKEND = "redis://localhost:6377/0"
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -200,3 +211,10 @@ LANGUAGES = (
 )
 
 MODELTRANSLATION_DEFAULT_LANGUAGE = 'uz'
+
+
+# Tasklar qayerdan yuklanishi kerakligini aniqlash
+CELERY_IMPORTS = (
+    "shop.tasks",  # Barcha Celery vazifalari joylashgan papkalarni qo‘shing
+)
+
