@@ -115,16 +115,24 @@ class LatestContactView(RetrieveAPIView):
 
 
 # goo da zakazchik zakaz berish uchun mahsulatlarga
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from goo.tasks import send_order_to_couriers
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_order(request, shop_id):
-    """Do‘kon ID bo‘yicha zakaz yaratish"""
-    serializer = OrderSerializer(data=request.data,
-                                 context={"request": request, "shop_id": shop_id})  # shop_id'ni qo‘shdik
+    """Do‘kon ID bo‘yicha zakaz yaratish va pro foydalanuvchilarga yuborish"""
+    serializer = OrderSerializer(data=request.data, context={"request": request, "shop_id": shop_id})
 
     if serializer.is_valid():
         order = serializer.save()
-        return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+        # Celery taskni chaqirish
+        send_order_to_couriers.delay(order.id, shop_id)
+
+        return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -52,12 +52,12 @@ class GooRegistrationSerializer(serializers.Serializer):
         phone_number = validated_data["phone_number"]
 
         # Ro‘lni topish yoki yaratish
-        pro_role, _ = UserRole.objects.get_or_create(name="goo")
+        goo_role, _ = UserRole.objects.get_or_create(name="goo")
 
         # Foydalanuvchini yaratish yoki topish
         worker, _ = User.objects.get_or_create(phone_number=phone_number)
 
-        worker.roles.add(pro_role)
+        worker.roles.add(goo_role)
 
         # Cache va bazadan kodni o‘chiramiz
         cache.delete(f"registration_wait_{phone_number}")
@@ -174,3 +174,4 @@ class OrderSerializer(serializers.ModelSerializer):
         validated_data["shop"] = shop  # Do‘konni avtomatik o‘rnatish
 
         return super().create(validated_data)
+

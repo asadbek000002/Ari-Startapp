@@ -17,6 +17,6 @@ urlpatterns = [
 
     path('contact/', LatestContactView.as_view(), name='latest-contact'),
 
-    path("shops/<int:shop_id>/order/", create_order, name="create-order"),
+    path("create_order/<int:shop_id>/", create_order, name="create-order"),
 
 ]

@@ -25,6 +25,7 @@ class Shop(models.Model):
     image = models.ImageField(upload_to=image_name, blank=True, null=True)
     title = models.CharField(max_length=55, null=True, blank=True)
     phone_number = models.CharField(max_length=13, null=True, blank=True)
+
     locations = models.CharField(max_length=150, null=True, blank=True)
     # POINT(longitude latitude)
     coordinates = gis_models.PointField(geography=True)  # Majburiy, chunki joy tanlanishi kerak

@@ -3,8 +3,10 @@ from django.core.cache import cache
 from rest_framework import serializers
 from user.models import UserRole, VerificationCode
 from django.contrib.auth import get_user_model
+from pro.models import DeliverProfile
 
 User = get_user_model()
+
 
 class ProRegistrationSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=20)
@@ -57,3 +59,12 @@ class ProRegistrationSerializer(serializers.Serializer):
         VerificationCode.objects.filter(phone_number=phone_number).delete()
 
         return worker
+
+
+class DeliverProfileSerializer(serializers.ModelSerializer):
+    avatar = serializers.ImageField(source="user.avatar", read_only=True)
+    full_name = serializers.CharField(source="user.full_name", read_only=True)
+
+    class Meta:
+        model = DeliverProfile
+        fields = ["avatar", "full_name", "created_at"]

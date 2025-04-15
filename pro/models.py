@@ -14,6 +14,7 @@ class DeliverProfile(models.Model):
     work_start = models.TimeField(null=True, blank=True)
     work_end = models.TimeField(null=True, blank=True)
     work_active = models.BooleanField(default=False)
+    has_responded = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -27,7 +28,7 @@ class DeliverProfile(models.Model):
 
     def generate_unique_id(self):
         while True:
-            new_id = str(f"A-{random.randint(100000, 999999)}")
+            new_id = str(f"A-{random.randint(10000, 99999)}")
             if not DeliverProfile.objects.filter(deliver_id=new_id).exists():
                 return new_id
 
@@ -37,10 +38,10 @@ class DeliverProfile(models.Model):
 
 # kuryer ning harakati uchun location
 class DeliverLocation(models.Model):
-    deliver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='deliver_locations')
+    deliver = models.ForeignKey(DeliverProfile, on_delete=models.CASCADE, related_name='deliver_locations')
     # POINT(longitude latitude)
     coordinates = gis_models.PointField(geography=True)  # Doimiy o‘zgarib turadigan location
     updated_at = models.DateTimeField(auto_now=True)  # Har safar yangilanadi
 
     def __str__(self):
-        return f"Courier {self.deliver.phone_number} - {self.coordinates}"
+        return f"Courier {self.deliver.user.phone_number} - {self.coordinates}"
