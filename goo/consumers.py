@@ -5,7 +5,7 @@ import json
 import redis
 from goo.models import Order, DeliverProfile
 
-r = redis.StrictRedis(host='localhost', port=6377, db=0)
+r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 
 class OrderOfferConsumer(AsyncWebsocketConsumer):
