@@ -13,6 +13,7 @@ from django.utils.timezone import localtime
 
 r = redis.StrictRedis(host='localhost', port=6377, db=0)
 
+
 @shared_task
 def send_order_to_couriers(order_id, shop_id):
     order = Order.objects.get(id=order_id)
@@ -33,7 +34,8 @@ def send_order_to_couriers(order_id, shop_id):
     ).filter(
         # Faol kuryerlarni aniqlash: Kunduzi va kechasi ishlovchilar
         Q(work_start__lte=current_time, work_end__gte=current_time) |  # kunduzi ishlovchilar
-        Q(work_start__gt=F('work_end')) & (Q(work_start__lte=current_time) | Q(work_end__gte=current_time))  # kechasi ishlovchilar
+        Q(work_start__gt=F('work_end')) & (Q(work_start__lte=current_time) | Q(work_end__gte=current_time))
+        # kechasi ishlovchilar
     ).filter(
         deliver_locations__id__in=Subquery(latest_location_subquery)
     ).annotate(
@@ -57,13 +59,14 @@ def send_order_to_couriers(order_id, shop_id):
                 "type": "send_notification",
                 "message": {
                     "order_id": order.id,
+                    "shop": order.shop.title,
                     "details": "Yangi buyurtma mavjud."
                 }
             }
         )
 
         # 7 soniya kutish
-        for _ in range(7):
+        for _ in range(10):
             if r.get(f"order_{order.id}_taken"):
                 break
             time.sleep(1)
@@ -71,14 +74,39 @@ def send_order_to_couriers(order_id, shop_id):
         if r.get(f"order_{order.id}_taken"):
             break
 
+    print(f"[send_order_to_couriers] checking Redis flag for order {order.id}")
     if r.get(f"order_{order.id}_taken"):
         deliver_id = r.get(f"order_{order.id}_taken").decode('utf-8')
+        print(f"[send_order_to_couriers] Order {order.id} taken by courier {deliver_id}")
         deliver_profile = DeliverProfile.objects.get(user_id=deliver_id)
         order.deliver = deliver_profile
         order.status = "assigned"
         order.save()
 
+        # Do'kon egasiga buyurtma qabul qilindi deb xabar yuborish
+        notify_shop_order_taken(order, deliver_id)
+
+        r.delete(f"order_{order.id}_taken")
         print(f"Buyurtma kuryerga berildi. Kuryer ID: {deliver_profile.id}")
         return f"Order {order.id} successfully assigned to courier {deliver_profile.id}"
 
     return f"Order {order.id} was not accepted by any courier."
+
+
+# tasks.py
+def notify_shop_order_taken(order, deliver_id):
+    print(f"[notify_shop_order_taken] chaqirildi: order_id={order.id}, deliver_id={deliver_id}")
+    shop_user = order.shop.user
+    print(f"[notify_shop_order_taken] Do‘kon egasi ID: {shop_user.id}")
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"user_{shop_user.id}_shop",
+        {
+            "type": "send_notification",
+            "message": {
+                "type": "tokon uchun zakaz",
+                "order_id": order.id,
+                "details": order.items
+            }
+        }
+    )

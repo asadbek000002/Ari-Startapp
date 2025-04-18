@@ -1,14 +1,39 @@
-from django.db.models import Q
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
+from django.db.models import Q
+from django.contrib.auth import get_user_model
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.generics import CreateAPIView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import status
 
 from shop.models import Shop, ShopRole
 from user.models import Location
-from shop.serializers import ShopFeaturedSerializer, ShopListSerializer, ShopMapListSerializer, ShopDetailSerializer, \
-    ShopRoleSerializer
+from shop.serializers import (ShopFeaturedSerializer, ShopListSerializer, ShopMapListSerializer,
+                              ShopDetailSerializer, ShopRoleSerializer, ShopRegistrationSerializer)
+
+User = get_user_model()
+
+
+class ShopRegistrationView(CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = ShopRegistrationSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        shop = serializer.save()
+
+        refresh = RefreshToken.for_user(shop)
+
+        return Response({
+            # "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }, status=status.HTTP_201_CREATED)
 
 
 @api_view(["GET"])

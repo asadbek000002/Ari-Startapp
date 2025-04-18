@@ -6,4 +6,5 @@ from user.middleware import TokenAuthMiddleware
 websocket_urlpatterns = [
     re_path(r'ws/goo/connect/$', TokenAuthMiddleware(OrderOfferConsumer.as_asgi())),
     re_path(r'ws/pro/connect/$', TokenAuthMiddleware(OrderOfferConsumer.as_asgi())),
+    re_path(r'ws/shop/connect/$', TokenAuthMiddleware(OrderOfferConsumer.as_asgi())),
 ]

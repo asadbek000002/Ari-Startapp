@@ -1,22 +1,22 @@
-from django.shortcuts import render, get_object_or_404
-from rest_framework import status, generics
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.generics import RetrieveAPIView, UpdateAPIView
+from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
+
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import RetrieveAPIView, UpdateAPIView, CreateAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import get_user_model
+from rest_framework import status
 
 from goo.models import Contact
 from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
     LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer
-from shop.models import Shop
 from user.models import Location
 
 User = get_user_model()
 
 
-class GooRegistrationView(generics.CreateAPIView):
+class GooRegistrationView(CreateAPIView):
     queryset = User.objects.all()
     serializer_class = GooRegistrationSerializer
     permission_classes = [AllowAny]
@@ -34,7 +34,7 @@ class GooRegistrationView(generics.CreateAPIView):
         }, status=status.HTTP_201_CREATED)
 
 
-class LocationCreateView(generics.CreateAPIView):
+class LocationCreateView(CreateAPIView):
     serializer_class = LocationSerializer
     permission_classes = [IsAuthenticated]
 
@@ -115,11 +115,8 @@ class LatestContactView(RetrieveAPIView):
 
 
 # goo da zakazchik zakaz berish uchun mahsulatlarga
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
 from goo.tasks import send_order_to_couriers
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

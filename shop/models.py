@@ -3,6 +3,7 @@ from django.contrib.gis.db import models as gis_models
 import os
 import uuid
 from geopy.geocoders import Nominatim
+from django.conf import settings
 
 
 def image_name(instance, filename):
@@ -22,6 +23,8 @@ class ShopRole(models.Model):
 # Create your models here.
 class Shop(models.Model):
     role = models.ForeignKey(ShopRole, on_delete=models.SET_NULL, related_name="users", null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name="shops")
     image = models.ImageField(upload_to=image_name, blank=True, null=True)
     title = models.CharField(max_length=55, null=True, blank=True)
     phone_number = models.CharField(max_length=13, null=True, blank=True)

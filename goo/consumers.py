@@ -5,7 +5,8 @@ import json
 import redis
 from goo.models import Order, DeliverProfile
 
-r = redis.StrictRedis(host='localhost', port=6379, db=0)
+r = redis.StrictRedis(host='localhost', port=6377, db=0)
+
 
 class OrderOfferConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -16,10 +17,16 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
             self.user = user
             self.user_id = user.id
 
+            # DeliverProfileni faqat bir marta olish
+
             if 'goo' in path:
                 expected_role = 'goo'
             elif 'pro' in path:
                 expected_role = 'pro'
+                self.deliver_profile = await sync_to_async(DeliverProfile.objects.get)(user=self.user)
+
+            elif 'shop' in path:
+                expected_role = 'shop'
             else:
                 expected_role = 'unknown'
 
@@ -65,13 +72,8 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
             }))
             return
 
-        deliver_profile = await sync_to_async(DeliverProfile.objects.get)(user=self.user)
-        order.deliver = deliver_profile
-        order.status = "assigned"
-        await sync_to_async(order.save)()
-
-        # Redis flag — Celery task to‘xtashi uchun
-        r.set(f"order_{order.id}_taken", "1")
+        # Redis flag — Celery task toxtashi uchun
+        r.set(f"order_{order.id}_taken", str(self.user.id))
 
         # Boshqa kuryerlarga to‘xtatish signali
         await self.channel_layer.group_send(
