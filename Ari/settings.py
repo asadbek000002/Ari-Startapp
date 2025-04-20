@@ -122,7 +122,6 @@ CELERY_RESULT_BACKEND = "redis://redis:6379/0"
 # CELERY_BROKER_URL = 'redis://localhost:6377/0'  # Local
 # # Backend natijalarini saqlash uchun Redis
 # CELERY_RESULT_BACKEND = "redis://localhost:6377/0"
-#
 
 CHANNEL_LAYERS = {
     "default": {
@@ -144,6 +143,8 @@ CACHES = {
         }
     }
 }
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

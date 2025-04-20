@@ -1,5 +1,4 @@
 from celery import shared_task
-from django.utils.timezone import localtime
 from django.utils.timezone import localtime, make_aware
 from datetime import datetime, timedelta
 from shop.models import Shop
@@ -10,14 +9,16 @@ def update_shop_status(shop_id, status):
     try:
         shop = Shop.objects.get(id=shop_id)
         shop.is_active = status
+
+        # SIGNALNI ISHGA TUSHIRMASLIK UCHUN:
+        shop._skip_signal = True
         shop.save()
         return f"✅ Shop {shop_id} holati yangilandi: {status}"
     except Shop.DoesNotExist:
         return f"❌ Xatolik: Shop {shop_id} topilmadi"
 
-
 @shared_task
-def schedule_shop_tasks():
+def schedule_shop_tasks(*args, **kwargs):
     """Har bir do‘kon uchun ochilish va yopilish vaqtlarini avtomatik rejalashtirish"""
     now = localtime()  # Offset-aware datetime
     shops = Shop.objects.all()

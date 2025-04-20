@@ -4,6 +4,11 @@ from shop.models import Shop
 from shop.tasks import schedule_shop_tasks
 
 @receiver(post_save, sender=Shop)
-def schedule_tasks_on_save(sender, instance, **kwargs):
-    """Shop saqlanganda Celery tasklarini ishga tushirish"""
-    schedule_shop_tasks.delay()
+def schedule_tasks_on_save(sender, instance, created, **kwargs):
+    """Do‘kon yaratilgan yoki yangilanganida taskni rejalashtirish"""
+    if created:  # Agar do‘kon yangi yaratilgan bo‘lsa
+        print(f"🔔 Do‘kon yaratildi: {instance.title}")
+        schedule_shop_tasks.delay()
+    else:
+        print(f"🔔 Do‘kon yangilandi: {instance.title}")
+        schedule_shop_tasks.delay()
