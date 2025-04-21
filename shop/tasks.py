@@ -17,13 +17,14 @@ def update_shop_status(shop_id, status):
     except Shop.DoesNotExist:
         return f"❌ Xatolik: Shop {shop_id} topilmadi"
 
-@shared_task
-def schedule_shop_tasks(*args, **kwargs):
-    """Har bir do‘kon uchun ochilish va yopilish vaqtlarini avtomatik rejalashtirish"""
-    now = localtime()  # Offset-aware datetime
-    shops = Shop.objects.all()
 
-    for shop in shops:
+@shared_task
+def schedule_shop_tasks(shop_id):
+    """Single shop uchun ochilish va yopilish vaqtlarini avtomatik rejalashtirish"""
+    now = localtime()
+    try:
+        shop = Shop.objects.get(id=shop_id)
+
         if shop.work_start and shop.work_end:
             open_time = datetime.combine(now.date(), shop.work_start)
             close_time = datetime.combine(now.date(), shop.work_end)
@@ -32,7 +33,7 @@ def schedule_shop_tasks(*args, **kwargs):
             open_time = make_aware(open_time)
             close_time = make_aware(close_time)
 
-            # Agar vaqt kechikkan bo‘lsa, keyingi kunga suramiz
+            # Agar vaqt kechikkan bo'lsa, keyingi kunga suramiz
             if open_time < now:
                 open_time += timedelta(days=1)
             if close_time < now:
@@ -46,4 +47,6 @@ def schedule_shop_tasks(*args, **kwargs):
             print(f"   - 📌 Ochiladi: {open_time}")
             print(f"   - ❌ Yopiladi: {close_time}")
 
-    return "✅ Do‘konlar uchun vazifalar muvaffaqiyatli rejalashtirildi!"
+        return f"✅ {shop.title} uchun vazifalar muvaffaqiyatli rejalashtirildi!"
+    except Shop.DoesNotExist:
+        return f"❌ Xatolik: Shop {shop_id} topilmadi"

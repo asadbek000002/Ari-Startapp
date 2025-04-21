@@ -1,6 +1,5 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
-from django.utils import timezone
 import json
 import redis
 from goo.models import Order, DeliverProfile
@@ -14,44 +13,29 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
         user = self.scope.get('user')
         path = self.scope.get('path', '')
 
-        if user.is_authenticated:
-            self.user = user
-            self.user_id = user.id
-
-            # DeliverProfileni faqat bir marta olish
-
-            if 'goo' in path:
-                expected_role = 'goo'
-            elif 'pro' in path:
-                expected_role = 'pro'
-                self.deliver_profile = await sync_to_async(DeliverProfile.objects.get)(user=self.user)
-
-            elif 'shop' in path:
-                expected_role = 'shop'
-            else:
-                expected_role = 'unknown'
-
-            role_obj = await sync_to_async(
-                lambda: user.roles.filter(name=expected_role).first()
-            )()
-            role_name = role_obj.name if role_obj else 'default'
-
-            self.room_group_name = f"user_{self.user_id}_{role_name}"
-            print(f"Group name: {self.room_group_name}")
-
-            await self.channel_layer.group_add(
-                self.room_group_name,
-                self.channel_name
-            )
-            await self.accept()
-        else:
+        if not user.is_authenticated:
             await self.close()
+            return
+
+        self.user = user
+        self.user_id = user.id
+
+        if 'pro' in path:
+            self.role = 'pro'
+            self.deliver_profile = await sync_to_async(DeliverProfile.objects.get)(user=user)
+        elif 'shop' in path:
+            self.role = 'shop'
+        elif 'goo' in path:
+            self.role = 'goo'
+        else:
+            self.role = 'default'
+
+        self.room_group_name = f"user_{self.user_id}_{self.role}"
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -69,24 +53,22 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
         if order.status != "pending":
             await self.send(text_data=json.dumps({
                 "type": "error",
-                "message": "Buyurtma allaqachon olingan yoki tugagan."
+                "message": "Buyurtma allaqachon olingan."
             }))
             return
 
-        # Redis flag — Celery task toxtashi uchun
-        r.set(f"order_{order.id}_taken", str(self.user.id))
-
-        # Boshqa kuryerlarga to‘xtatish signali
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                "type": "order_taken",
-                "order_id": order.id
-            }
-        )
+        already_taken = r.get(f"order_{order.id}_taken")
+        if not already_taken:
+            r.set(f"order_{order.id}_taken", str(self.user_id))
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    "type": "order_taken",
+                    "order_id": order.id
+                }
+            )
 
     async def reject_order(self, order_id):
-        # Reject hech narsa qilmaydi, task navbatdagiga o‘tadi
         await self.send(text_data=json.dumps({
             "type": "rejected",
             "order_id": order_id
@@ -99,5 +81,4 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
         }))
 
     async def send_notification(self, event):
-        # Taskdan push yuborishda ishlatiladi
         await self.send(text_data=json.dumps(event["message"]))
