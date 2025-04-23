@@ -40,7 +40,7 @@ class DeliverProfile(models.Model):
 class DeliverLocation(models.Model):
     deliver = models.ForeignKey(DeliverProfile, on_delete=models.CASCADE, related_name='deliver_locations')
     # POINT(longitude latitude)
-    coordinates = gis_models.PointField(geography=True)  # Doimiy o‘zgarib turadigan location
+    coordinates = gis_models.PointField(geography=True, srid=4326)  # Doimiy o‘zgarib turadigan location
     updated_at = models.DateTimeField(auto_now=True)  # Har safar yangilanadi
 
     def __str__(self):

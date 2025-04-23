@@ -31,7 +31,7 @@ class Shop(models.Model):
 
     locations = models.CharField(max_length=150, null=True, blank=True)
     # POINT(longitude latitude)
-    coordinates = gis_models.PointField(geography=True)  # Majburiy, chunki joy tanlanishi kerak
+    coordinates = gis_models.PointField(geography=True, srid=4326)  # Majburiy, chunki joy tanlanishi kerak
     about = models.TextField(max_length=2000, null=True, blank=True)
     rating = models.FloatField(default=0, null=True, blank=True)
     work_start = models.TimeField(null=True, blank=True)

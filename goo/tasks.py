@@ -11,7 +11,7 @@ import redis
 import time
 from django.utils.timezone import localtime
 
-# r = redis.StrictRedis(host='localhost', port=6377, db=0)
+r = redis.StrictRedis(host='localhost', port=6377, db=0)
 r = redis.StrictRedis(host='redis', port=6379, db=0)
 
 
@@ -56,6 +56,7 @@ def send_order_to_couriers(order_id, shop_id):
                 "message": {
                     "order_id": order.id,
                     "shop": shop.title,
+                    "coordinates": (shop.coordinates.x, shop.coordinates.y),
                     "details": "Yangi buyurtma mavjud."
                 }
             }
@@ -69,6 +70,19 @@ def send_order_to_couriers(order_id, shop_id):
         if r.get(f"order_{order.id}_taken"):
             break
 
+        # Agar vaqt tugasa, kuryerga qabul qilish vaqti tugaganini xabar qilish
+        if r.get(f"order_{order.id}_taken") is None:
+            async_to_sync(channel_layer.group_send)(
+                f"user_{deliver.user.id}_pro",
+                {
+                    "type": "send_notification",
+                    "message": {
+                        "order_id": order.id,
+                        "details": "Buyurtma qabul qilish vaqti tugadi."
+                    }
+                }
+            )
+
     taken_by = r.get(f"order_{order.id}_taken")
     if taken_by:
         deliver_id = taken_by.decode('utf-8')
@@ -78,6 +92,7 @@ def send_order_to_couriers(order_id, shop_id):
         order.save()
 
         notify_shop_order_taken(order, deliver_id)
+        notify_deliver_order_taken(order, deliver_profile)
 
         r.delete(f"order_{order.id}_taken")
         return f"Order {order.id} assigned to courier {deliver_profile.id}"
@@ -93,10 +108,38 @@ def notify_shop_order_taken(order, deliver_id):
         {
             "type": "send_notification",
             "message": {
-                "type": "zakaz_qabul_qilindi",
+                "type": "yangi_zakaz_mavjud",
                 "order_id": order.id,
                 "deliver_id": deliver_id,
                 "details": order.items
+            }
+        }
+    )
+
+
+def notify_deliver_order_taken(order, deliver_profile):
+    order_user = order.user
+    channel_layer = get_channel_layer()
+    latest_location = DeliverLocation.objects.filter(
+        deliver=deliver_profile
+    ).order_by('-updated_at').first()
+
+    if latest_location:
+        latest_coords = (latest_location.coordinates.x, latest_location.coordinates.y)
+    else:
+        latest_coords = None
+
+    async_to_sync(channel_layer.group_send)(
+        f"user_{order_user.id}_goo",
+        {
+            "type": "send_notification",
+            "message": {
+                "type": "zakaz_qabul_qilindi",
+                "order_id": order.id,
+                "deliver_id": str(deliver_profile.id),
+                "deliver_name": deliver_profile.user.full_name,  # Kuryerning ismi
+                "deliver_phone": deliver_profile.user.phone_number,  # Kuryerning telefon raqami
+                "latest_coords": latest_coords  # Buyurtma ma'lumotlari
             }
         }
     )

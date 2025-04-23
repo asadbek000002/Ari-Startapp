@@ -31,6 +31,7 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
             self.role = 'default'
 
         self.room_group_name = f"user_{self.user_id}_{self.role}"
+        print(f"User {self.user_id} with role {self.role} connected to group {self.room_group_name}")
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
