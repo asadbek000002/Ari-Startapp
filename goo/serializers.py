@@ -174,4 +174,3 @@ class OrderSerializer(serializers.ModelSerializer):
         validated_data["shop"] = shop  # Do‘konni avtomatik o‘rnatish
 
         return super().create(validated_data)
-
