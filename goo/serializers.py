@@ -71,7 +71,7 @@ class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
         fields = ['id', 'custom_name', 'address', 'coordinates', 'created_at', "active"]
-        read_only_fields = ['created_at', 'address']
+        read_only_fields = ['created_at', ]
 
     def create(self, validated_data):
         user = self.context['request'].user
@@ -83,21 +83,16 @@ class LocationSerializer(serializers.ModelSerializer):
             coordinates__distance_lte=(coordinates, D(m=5))  # 5 metr radius
         ).first()
 
-        geolocator = Nominatim(user_agent="geoapi")
-        lat, lon = coordinates.y, coordinates.x  # Latitude va Longitude olish
-        location = geolocator.reverse((lat, lon), language='en')
-        address = location.address if location else "Unknown Location"
-
         if existing_location:
             # Mavjud joyni yangilash
             existing_location.custom_name = validated_data.get('custom_name', existing_location.custom_name)
             existing_location.coordinates = coordinates
-            existing_location.address = address
+            existing_location.address = validated_data.get('address', existing_location.address)
             existing_location.save()
             return existing_location
 
         # Yangi joy yaratish
-        validated_data['address'] = address
+        validated_data['user'] = user
         return super().create(validated_data)
 
 
@@ -174,3 +169,16 @@ class OrderSerializer(serializers.ModelSerializer):
         validated_data["shop"] = shop  # Do‘konni avtomatik o‘rnatish
 
         return super().create(validated_data)
+
+
+class OrderUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = [
+            "house_number",
+            "apartment_number",
+            "floor",
+            "has_intercom",
+            "intercom_code",
+            "additional_note",
+        ]

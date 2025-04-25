@@ -1,7 +1,8 @@
 from django.urls import path
 
 from goo.views import GooRegistrationView, list_locations, LocationCreateView, create_order, update_location, \
-    detail_location, active_location, UserProfileView, UpdateUserView, LatestContactView
+    detail_location, active_location, UserProfileView, UpdateUserView, LatestContactView, update_order, \
+    retry_order_delivery
 
 urlpatterns = [
     path('register/', GooRegistrationView.as_view(), name='goo-register'),
@@ -18,5 +19,7 @@ urlpatterns = [
     path('contact/', LatestContactView.as_view(), name='latest-contact'),
 
     path("create_order/<int:shop_id>/", create_order, name="create-order"),
+    path("orders/<int:order_id>/update/", update_order, name="update_order"),
+    path("orders/<int:order_id>/retry/", retry_order_delivery, name="update_order"),
 
 ]

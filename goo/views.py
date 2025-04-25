@@ -8,9 +8,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 
-from goo.models import Contact
+from goo.models import Contact, Order
 from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
-    LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer
+    LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer
 from user.models import Location
 
 User = get_user_model()
@@ -133,3 +133,40 @@ def create_order(request, shop_id):
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_order(request, order_id):
+    """Orderni yangilash (faqat manzil bo‘yicha) va courierlarga yuborish"""
+    try:
+        order = Order.objects.get(id=order_id, user=request.user, status="pending")
+    except Order.DoesNotExist:
+        return Response({"detail": "Buyurtma topilmadi yoki uni o‘zgartirish mumkin emas."},
+                        status=status.HTTP_404_NOT_FOUND)
+
+    serializer = OrderUpdateSerializer(order, data=request.data, partial=True)
+
+    if serializer.is_valid():
+        serializer.save()
+
+        # Celery taskni shu yerda chaqiramiz
+        send_order_to_couriers.delay(order.id, order.shop.id)
+
+        return Response(OrderSerializer(order).data)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def retry_order_delivery(request, order_id):
+    """Buyurtmani qayta courierlarga yuborish"""
+    try:
+        order = Order.objects.get(id=order_id, user=request.user, status="pending")
+    except Order.DoesNotExist:
+        return Response({"detail": "Buyurtma topilmadi yoki uni qayta yuborib bo‘lmaydi."},
+                        status=status.HTTP_404_NOT_FOUND)
+
+    send_order_to_couriers.delay(order.id, order.shop.id)
+    return Response({"detail": "Buyurtma kuryerlarga qayta yuborildi."})

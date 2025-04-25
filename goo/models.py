@@ -26,6 +26,13 @@ class Order(models.Model):
                                 blank=True)  # Yetkazib beruvchi
     items = models.TextField()  # Zakaz qilinadigan mahsulotlar
     allow_other_shops = models.BooleanField(default=False)  # Boshqa do‘konlardan olib kelish mumkinmi?
+    house_number = models.CharField(max_length=10, null=True, blank=True)
+    apartment_number = models.CharField(max_length=10, null=True, blank=True)
+    floor = models.IntegerField(max_length=999, null=True, blank=True)
+    has_intercom = models.BooleanField(default=False)
+    intercom_code = models.CharField(max_length=20, blank=True, null=True)
+    additional_note = models.TextField(max_length=250, blank=True, null=True)
+
     status = models.CharField(
         max_length=20,
         choices=[("pending", "Pending"), ("assigned", "Assigned"), ("completed", "Completed")],
