@@ -3,8 +3,12 @@ from asgiref.sync import sync_to_async
 import json
 import redis
 from goo.models import Order, DeliverProfile
+from django.utils.timezone import localtime
+from django.utils.timezone import now
 
 # r = redis.StrictRedis(host='localhost', port=6377, db=0)
+
+
 r = redis.StrictRedis(host='redis', port=6379, db=0)
 
 
@@ -47,6 +51,41 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
             await self.accept_order(order_id)
         elif action == "reject":
             await self.reject_order(order_id)
+        elif action == "location_update":
+            await self.update_location(data)
+
+    async def update_location(self, data):
+        lat = data.get("latitude")
+        lon = data.get("longitude")
+        if not lat or not lon:
+            return
+
+        redis_key = f"location:{self.user_id}"
+        timestamp = localtime(now()).isoformat()
+        r.set(redis_key, json.dumps({
+            "lat": lat,
+            "lon": lon,
+            "timestamp": timestamp
+        }), ex=180)  # 3 daqiqa expiration (optional)
+
+        # Shu yerda siz WebSocket orqali joylashuvni boshqa guruhlarga yuborsangiz ham bo'ladi
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "location_broadcast",
+                "user_id": self.user_id,
+                "lat": lat,
+                "lon": lon
+            }
+        )
+
+    async def location_broadcast(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "location_update",
+            "user_id": event["user_id"],
+            "latitude": event["lat"],
+            "longitude": event["lon"]
+        }))
 
     async def accept_order(self, order_id):
         order = await sync_to_async(Order.objects.get)(id=order_id)

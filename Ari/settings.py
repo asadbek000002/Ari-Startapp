@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     "corsheaders",
     'rest_framework_simplejwt',
+    'django_celery_beat',
 
     'user',
     'pro',
@@ -145,6 +146,9 @@ CACHES = {
 }
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+# CELERY BEAT sozlamalari
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

@@ -61,10 +61,26 @@ class ProRegistrationSerializer(serializers.Serializer):
         return worker
 
 
-class DeliverProfileSerializer(serializers.ModelSerializer):
+class DeliverHomeSerializer(serializers.ModelSerializer):
     avatar = serializers.ImageField(source="user.avatar", read_only=True)
     full_name = serializers.CharField(source="user.full_name", read_only=True)
 
     class Meta:
         model = DeliverProfile
-        fields = ["avatar", "full_name", "created_at"]
+        fields = ["avatar", "full_name", "deliver_id", "work_active"]
+
+
+class DeliverProfileSerializer(serializers.ModelSerializer):
+    avatar = serializers.ImageField(source="user.avatar", read_only=True)
+    full_name = serializers.CharField(source="user.full_name", read_only=True)
+    phone_number = serializers.CharField(source="user.phone_number", read_only=True)
+
+    class Meta:
+        model = DeliverProfile
+        fields = ["avatar", "full_name", "deliver_id", "balance", "phone_number", "work_start", "work_end"]
+
+
+class DeliverActiveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeliverProfile
+        fields = ["work_active"]

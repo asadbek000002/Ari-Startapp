@@ -151,7 +151,7 @@ def update_order(request, order_id):
         serializer.save()
 
         # Celery taskni shu yerda chaqiramiz
-        send_order_to_couriers.delay(order.id, order.shop.id)
+        # send_order_to_couriers.delay(order.id, order.shop.id)
 
         return Response(OrderSerializer(order).data)
 

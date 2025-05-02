@@ -28,8 +28,8 @@ class Order(models.Model):
     allow_other_shops = models.BooleanField(default=False)  # Boshqa do‘konlardan olib kelish mumkinmi?
     house_number = models.CharField(max_length=10, null=True, blank=True)
     apartment_number = models.CharField(max_length=10, null=True, blank=True)
-    floor = models.IntegerField(max_length=999, null=True, blank=True)
-    has_intercom = models.BooleanField(default=False)
+    floor = models.IntegerField(null=True, blank=True)
+    has_intercom = models.BooleanField(default=False) # kerak emas
     intercom_code = models.CharField(max_length=20, blank=True, null=True)
     additional_note = models.TextField(max_length=250, blank=True, null=True)
 

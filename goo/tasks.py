@@ -2,12 +2,13 @@ from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
 from django.utils.timezone import localtime
+from datetime import datetime
 from django.db.models import OuterRef, Subquery, Q, F
 
 from celery import shared_task
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-
+import json
 import redis
 import time
 
@@ -16,6 +17,8 @@ from pro.models import DeliverLocation, DeliverProfile
 
 # Redis connection
 # r = redis.StrictRedis(host='localhost', port=6377, db=0)
+
+
 r = redis.StrictRedis(host='redis', port=6379, db=0)
 
 @shared_task
@@ -37,7 +40,7 @@ def send_order_to_couriers(order_id, shop_id):
     ).filter(
         Q(work_start__lte=current_time, work_end__gte=current_time) |
         Q(work_start__gt=F('work_end')) & (
-            Q(work_start__lte=current_time) | Q(work_end__gte=current_time)
+                Q(work_start__lte=current_time) | Q(work_end__gte=current_time)
         )
     ).filter(
         deliver_locations__id__in=Subquery(latest_location_subquery)
@@ -54,7 +57,7 @@ def send_order_to_couriers(order_id, shop_id):
 
         send_notification_to_deliver(channel_layer, deliver.user.id, order, shop)
 
-        for _ in range(10):
+        for _ in range(20):
             if r.get(f"order_{order.id}_taken"):
                 break
             time.sleep(1)
@@ -88,6 +91,7 @@ def send_notification_to_deliver(channel_layer, deliver_user_id, order, shop):
         }
     )
 
+
 def send_timeout_notification(channel_layer, deliver_user_id, order_id):
     async_to_sync(channel_layer.group_send)(
         f"user_{deliver_user_id}_pro",
@@ -100,6 +104,7 @@ def send_timeout_notification(channel_layer, deliver_user_id, order_id):
         }
     )
 
+
 def assign_order_to_courier(order, deliver_user_id):
     deliver_profile = DeliverProfile.objects.get(user_id=deliver_user_id)
     order.deliver = deliver_profile
@@ -108,6 +113,7 @@ def assign_order_to_courier(order, deliver_user_id):
 
     notify_shop_order_taken(order, deliver_user_id)
     notify_deliver_order_taken(order, deliver_profile)
+
 
 def notify_shop_order_taken(order, deliver_id):
     shop_user = order.shop.user
@@ -124,6 +130,7 @@ def notify_shop_order_taken(order, deliver_id):
             }
         }
     )
+
 
 def notify_deliver_order_taken(order, deliver_profile):
     order_user = order.user
@@ -149,6 +156,7 @@ def notify_deliver_order_taken(order, deliver_profile):
         }
     )
 
+
 def notify_customer_no_courier_found(channel_layer, order):
     async_to_sync(channel_layer.group_send)(
         f"user_{order.user.id}_goo",
@@ -161,3 +169,32 @@ def notify_customer_no_courier_found(channel_layer, order):
             }
         }
     )
+
+
+@shared_task
+def save_locations_from_redis():
+    for key in r.scan_iter(match="location:*"):
+        try:
+            user_id = int(key.decode().split(":")[1])
+            data = json.loads(r.get(key))
+            lat = data.get("lat")
+            lon = data.get("lon")
+            timestamp = data.get("timestamp")
+
+            if not (lat and lon and timestamp):
+                continue
+
+            profile = DeliverProfile.objects.get(user__id=user_id)
+            point = Point(float(lon), float(lat))
+
+            # Oxirgi joylashuv bo‘yicha bor-yo‘g‘ini tekshirib yangilash
+            location, created = DeliverLocation.objects.get_or_create(
+                deliver=profile,
+                defaults={"coordinates": point, "updated_at": datetime.fromisoformat(timestamp)}
+            )
+            if not created:
+                location.coordinates = point
+                location.updated_at = datetime.fromisoformat(timestamp)
+                location.save()
+        except Exception as e:
+            print(f"Error updating location for {key}: {e}")

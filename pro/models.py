@@ -9,7 +9,7 @@ from django.conf import settings
 class DeliverProfile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="deliver_profile")
-    deliver_id = models.ImageField(max_length=8, unique=True, editable=False)
+    deliver_id = models.CharField(max_length=8, unique=True, editable=False)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     work_start = models.TimeField(null=True, blank=True)
     work_end = models.TimeField(null=True, blank=True)
