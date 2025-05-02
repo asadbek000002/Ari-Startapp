@@ -57,6 +57,18 @@ services:
       - redis
     restart: always
 
+  celery_beat:
+    build: .
+    env_file:
+      - .env
+    command: celery -A Ari beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - .:/Ari
+    depends_on:
+      - redis
+      - ari_db
+    restart: always
+
 volumes:
   postgres_data:
   static_volume:
