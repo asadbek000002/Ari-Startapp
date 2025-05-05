@@ -128,7 +128,7 @@ def create_order(request, shop_id):
         order = serializer.save()
 
         # Celery taskni chaqirish
-        send_order_to_couriers.delay(order.id, shop_id)
+        # send_order_to_couriers.delay(order.id, shop_id)
 
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
@@ -151,7 +151,7 @@ def update_order(request, order_id):
         serializer.save()
 
         # Celery taskni shu yerda chaqiramiz
-        # send_order_to_couriers.delay(order.id, order.shop.id)
+        send_order_to_couriers.delay(order.id, order.shop.id)
 
         return Response(OrderSerializer(order).data)
 
@@ -170,3 +170,44 @@ def retry_order_delivery(request, order_id):
 
     send_order_to_couriers.delay(order.id, order.shop.id)
     return Response({"detail": "Buyurtma kuryerlarga qayta yuborildi."})
+
+
+from django.http import JsonResponse
+
+from .serializers import CancelOrderSerializer
+from django.http import HttpResponseForbidden
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cancel_order(request, order_id):
+    # URL'ga qarab ro'lni aniqlash
+    if 'goo' in request.path:
+        canceled_by = 'goo'  # Zakazchi (Customer)
+    elif 'pro' in request.path:
+        canceled_by = 'pro'  # Kuryer (Courier)
+    else:
+        return HttpResponseForbidden("Invalid role in URL")  # Noto'g'ri URL
+
+    # Order'ni olish
+    order = get_object_or_404(Order, id=order_id)
+
+    # Serializer yordamida reason (izoh)ni olish
+    serializer = CancelOrderSerializer(data=request.data)
+    if serializer.is_valid():
+        reason = serializer.validated_data.get('reason', 'No reason provided')
+    else:
+        reason = 'No reason provided'
+
+    # Orderni bekor qilish
+    try:
+        order.cancel(canceled_by=canceled_by, user=request.user, reason=reason)
+    except ValueError as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+    return JsonResponse({
+        'status': 'success',
+        'message': f'Order {order.id} has been canceled by {canceled_by}.',
+        'canceled_by_user': request.user.id,
+        'reason': reason
+    })

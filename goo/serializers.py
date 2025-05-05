@@ -182,3 +182,7 @@ class OrderUpdateSerializer(serializers.ModelSerializer):
             "intercom_code",
             "additional_note",
         ]
+
+
+class CancelOrderSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True)
