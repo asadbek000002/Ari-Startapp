@@ -205,6 +205,12 @@ def cancel_order(request, order_id):
     except ValueError as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
+        # Agar kuryer bekor qilgan bo‘lsa, u yana available bo'lishi kerak
+    if order.deliver:
+        deliver_profile = order.deliver
+        deliver_profile.is_busy = False
+        deliver_profile.save(update_fields=["is_busy"])
+
     return JsonResponse({
         'status': 'success',
         'message': f'Order {order.id} has been canceled by {canceled_by}.',

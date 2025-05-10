@@ -205,8 +205,8 @@ REST_FRAMEWORK = {
     )
 }
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=60),
 }
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 209715200  # 200 MB (baytlarda)

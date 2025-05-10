@@ -57,7 +57,15 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
     async def update_location(self, data):
         lat = data.get("latitude")
         lon = data.get("longitude")
-        if not lat or not lon:
+        if lat is None or lon is None:
+            return
+
+        try:
+            profile = await sync_to_async(DeliverProfile.objects.get)(user_id=self.user_id)
+            if not profile.work_active:
+                return  # Faqat active bo'lgan kuryerlar
+
+        except DeliverProfile.DoesNotExist:
             return
 
         redis_key = f"location:{self.user_id}"
@@ -65,19 +73,21 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
         r.set(redis_key, json.dumps({
             "lat": lat,
             "lon": lon,
+            "work_active": profile.work_active,
+            "is_busy": profile.is_busy,
             "timestamp": timestamp
         }), ex=180)  # 3 daqiqa expiration (optional)
 
         # Shu yerda siz WebSocket orqali joylashuvni boshqa guruhlarga yuborsangiz ham bo'ladi
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                "type": "location_broadcast",
-                "user_id": self.user_id,
-                "lat": lat,
-                "lon": lon
-            }
-        )
+        # await self.channel_layer.group_send(
+        #     self.room_group_name,
+        #     {
+        #         "type": "location_broadcast",
+        #         "user_id": str(self.user_id),
+        #         "lat": lat,
+        #         "lon": lon
+        #     }
+        # )
 
     async def location_broadcast(self, event):
         await self.send(text_data=json.dumps({

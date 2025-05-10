@@ -14,7 +14,7 @@ class DeliverProfile(models.Model):
     work_start = models.TimeField(null=True, blank=True)
     work_end = models.TimeField(null=True, blank=True)
     work_active = models.BooleanField(default=False)
-    has_responded = models.BooleanField(default=False)
+    is_busy = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
