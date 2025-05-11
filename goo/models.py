@@ -21,6 +21,14 @@ class Product(models.Model):
 
 # dokonga zakaz berish
 class Order(models.Model):
+    DIRECTION_CHOICES = [
+        ('en_route_to_store', 'Do‘konga yo‘lda'),
+        ('arrived_at_store', 'Do‘konga yetib keldi'),
+        ('picked_up', 'Yukni oldi'),
+        ('en_route_to_customer', 'Mijozga yo‘lda'),
+        ('delivered', 'Yetkazib berildi'),
+    ]
+
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("assigned", "Assigned"),
@@ -50,6 +58,8 @@ class Order(models.Model):
 
     canceled_by_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                          related_name="canceled_orders")
+
+    direction = models.CharField(max_length=30, choices=DIRECTION_CHOICES, default='en_route_to_store')
     canceled_by = models.CharField(max_length=10, choices=CANCELED_BY_CHOICES, null=True, blank=True)
     cancel_reason = models.TextField(null=True, blank=True)
     canceled_at = models.DateTimeField(null=True, blank=True)
@@ -60,6 +70,8 @@ class Order(models.Model):
     delivery_duration_min = models.FloatField(null=True, blank=True)
     assigned_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
+
+    picked_up_at = models.DateTimeField(null=True, blank=True)
 
     def cancel(self, canceled_by, user, reason=None):
         if self.status == "canceled":

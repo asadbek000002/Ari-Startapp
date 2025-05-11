@@ -220,7 +220,6 @@ def cancel_order(request, order_id):
     })
 
 
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -233,11 +232,24 @@ class CustomerOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Zakazchining eng oxirgi "assigned" statusidagi buyurtmasi
-        order = Order.objects.filter(user=request.user, status="assigned").order_by('-created_at').first()
+        order = (
+            Order.objects
+            .select_related('deliver__user')
+            .only(
+                'id', 'delivered_at',
+                'deliver__user__id',
+                'deliver__user__avatar',
+                'deliver__user__full_name',
+                'deliver__user__phone_number',
+                'deliver__user__rating',
+            )
+            .filter(user=request.user, status="assigned")
+            .order_by('-created_at')
+            .first()
+        )
 
         if order:
-            serializer = OrderActiveGooSerializer(order)
+            serializer = OrderActiveGooSerializer(order, context={'request': request})
             return Response(serializer.data)
         else:
             return Response({"detail": "No active order found."}, status=404)

@@ -88,30 +88,55 @@ class DeliverActiveSerializer(serializers.ModelSerializer):
         fields = ["work_active"]
 
 
+class CustomerUserInfoSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'avatar', 'full_name', 'phone_number', 'rating']
+
+    def get_avatar(self, obj):
+        request = self.context.get('request')
+        if obj.avatar and hasattr(obj.avatar, 'url'):
+            return request.build_absolute_uri(obj.avatar.url)
+        return None
+
+
 class OrderActiveProSerializer(serializers.ModelSerializer):
+    customer_info = serializers.SerializerMethodField()
+
     class Meta:
         model = Order
-        fields = [
-            'id',  # Zakaz ID
-            'user',  # Foydalanuvchi (user)
-            'shop',  # Do'kon (shop)
-            'deliver',  # Yetkazib beruvchi (deliver)
-            'items',  # Mahsulotlar ro'yxati (items)
-            'allow_other_shops',  # Boshqa do'konlardan olib kelish (allow_other_shops)
-            'house_number',  # Uy raqami (house_number)
-            'apartment_number',  # Kvartira raqami (apartment_number)
-            'floor',  # Qavat (floor)
-            'has_intercom',  # Interkom mavjudligi (has_intercom)
-            'intercom_code',  # Interkom kodi (intercom_code)
-            'additional_note',  # Qo'shimcha izoh (additional_note)
-            'status',  # Zakaz holati (status)
-            'canceled_by_user',  # Zakazni bekor qilgan foydalanuvchi (canceled_by_user)
-            'canceled_by',  # Zakazni bekor qilgan shaxs (canceled_by)
-            'cancel_reason',  # Bekor qilish sababi (cancel_reason)
-            'canceled_at',  # Bekor qilingan vaqt (canceled_at)
-            'created_at',  # Zakaz yaratish vaqti (created_at)
-            'delivery_distance_km',  # Yetkazib berish masofasi (delivery_distance_km)
-            'delivery_duration_min',  # Yetkazib berish davomiyligi (delivery_duration_min)
-            'assigned_at',  # Tayinlangan vaqt (assigned_at)
-            'delivered_at',  # Yetkazib berilgan vaqt (delivered_at)
-        ]
+        fields = ['id', 'delivered_at', 'customer_info']
+
+    def get_customer_info(self, obj):
+        request = self.context.get('request')
+        return CustomerUserInfoSerializer(obj.user, context={'request': request}).data
+
+# class OrderActiveProSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Order
+#         fields = [
+#             'id',  # Zakaz ID
+#             'user',  # Foydalanuvchi (user)
+#             'shop',  # Do'kon (shop)
+#             'deliver',  # Yetkazib beruvchi (deliver)
+#             'items',  # Mahsulotlar ro'yxati (items)
+#             'allow_other_shops',  # Boshqa do'konlardan olib kelish (allow_other_shops)
+#             'house_number',  # Uy raqami (house_number)
+#             'apartment_number',  # Kvartira raqami (apartment_number)
+#             'floor',  # Qavat (floor)
+#             'has_intercom',  # Interkom mavjudligi (has_intercom)
+#             'intercom_code',  # Interkom kodi (intercom_code)
+#             'additional_note',  # Qo'shimcha izoh (additional_note)
+#             'status',  # Zakaz holati (status)
+#             'canceled_by_user',  # Zakazni bekor qilgan foydalanuvchi (canceled_by_user)
+#             'canceled_by',  # Zakazni bekor qilgan shaxs (canceled_by)
+#             'cancel_reason',  # Bekor qilish sababi (cancel_reason)
+#             'canceled_at',  # Bekor qilingan vaqt (canceled_at)
+#             'created_at',  # Zakaz yaratish vaqti (created_at)
+#             'delivery_distance_km',  # Yetkazib berish masofasi (delivery_distance_km)
+#             'delivery_duration_min',  # Yetkazib berish davomiyligi (delivery_duration_min)
+#             'assigned_at',  # Tayinlangan vaqt (assigned_at)
+#             'delivered_at',  # Yetkazib berilgan vaqt (delivered_at)
+#         ]

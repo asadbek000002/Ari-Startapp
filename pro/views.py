@@ -79,11 +79,58 @@ class DeliverOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Zakazchining eng oxirgi "assigned" statusidagi buyurtmasi
-        order = Order.objects.filter(user=request.user, status="assigned").order_by('-created_at').first()
+        order = (
+            Order.objects
+            .select_related("deliver__user", "user")  # deliver.user va user (customer) ni oldindan olish
+            .only(
+                "id", "delivered_at", "user__id", "user__avatar", "user__full_name",
+                "user__phone_number", "user__rating",  # Zakaz bergan user maydonlari
+                "deliver__user__id"  # Faqat filter uchun kerak
+            )
+            .filter(deliver__user=request.user, status='assigned')
+            .order_by('-created_at')
+            .first()
+        )
 
         if order:
-            serializer = OrderActiveProSerializer(order)
+            serializer = OrderActiveProSerializer(order, context={'request': request})
             return Response(serializer.data)
         else:
             return Response({"detail": "No active order found."}, status=404)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+
+
+class CourierOrderDirectionUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        new_direction = request.data.get("direction")
+        valid_directions = ['arrived_at_store', 'picked_up', 'en_route_to_customer', 'delivered']
+
+        if new_direction not in valid_directions:
+            return Response({"detail": "Invalid direction"}, status=400)
+
+        try:
+            order = Order.objects.select_related('deliver__user').get(
+                id=order_id,
+                deliver__user=request.user,
+                status='assigned'  # faqat assigned bo'lgan order
+            )
+        except Order.DoesNotExist:
+            return Response({"detail": "Order not found"}, status=404)
+
+        # Yo'nalish bo'yicha vaqtlar
+        if new_direction == 'picked_up':
+            order.picked_up_at = timezone.now()
+        elif new_direction == 'delivered':
+            order.delivered_at = timezone.now()
+            order.status = 'completed'  # Yakunlangan holat
+
+        order.direction = new_direction
+        order.save()
+        return Response({"detail": "Direction updated", "direction": order.direction})
