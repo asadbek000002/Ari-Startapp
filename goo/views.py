@@ -10,7 +10,8 @@ from rest_framework import status
 
 from goo.models import Contact, Order
 from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
-    LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer
+    LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer, \
+    OrderActiveGooSerializer
 from user.models import Location
 
 User = get_user_model()
@@ -217,3 +218,26 @@ def cancel_order(request, order_id):
         'canceled_by_user': request.user.id,
         'reason': reason
     })
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from .models import Order
+from .serializers import OrderSerializer
+
+
+class CustomerOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Zakazchining eng oxirgi "assigned" statusidagi buyurtmasi
+        order = Order.objects.filter(user=request.user, status="assigned").order_by('-created_at').first()
+
+        if order:
+            serializer = OrderActiveGooSerializer(order)
+            return Response(serializer.data)
+        else:
+            return Response({"detail": "No active order found."}, status=404)

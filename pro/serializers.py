@@ -1,6 +1,8 @@
 import random
 from django.core.cache import cache
 from rest_framework import serializers
+
+from goo.models import Order
 from user.models import UserRole, VerificationCode
 from django.contrib.auth import get_user_model
 from pro.models import DeliverProfile
@@ -84,3 +86,32 @@ class DeliverActiveSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliverProfile
         fields = ["work_active"]
+
+
+class OrderActiveProSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = [
+            'id',  # Zakaz ID
+            'user',  # Foydalanuvchi (user)
+            'shop',  # Do'kon (shop)
+            'deliver',  # Yetkazib beruvchi (deliver)
+            'items',  # Mahsulotlar ro'yxati (items)
+            'allow_other_shops',  # Boshqa do'konlardan olib kelish (allow_other_shops)
+            'house_number',  # Uy raqami (house_number)
+            'apartment_number',  # Kvartira raqami (apartment_number)
+            'floor',  # Qavat (floor)
+            'has_intercom',  # Interkom mavjudligi (has_intercom)
+            'intercom_code',  # Interkom kodi (intercom_code)
+            'additional_note',  # Qo'shimcha izoh (additional_note)
+            'status',  # Zakaz holati (status)
+            'canceled_by_user',  # Zakazni bekor qilgan foydalanuvchi (canceled_by_user)
+            'canceled_by',  # Zakazni bekor qilgan shaxs (canceled_by)
+            'cancel_reason',  # Bekor qilish sababi (cancel_reason)
+            'canceled_at',  # Bekor qilingan vaqt (canceled_at)
+            'created_at',  # Zakaz yaratish vaqti (created_at)
+            'delivery_distance_km',  # Yetkazib berish masofasi (delivery_distance_km)
+            'delivery_duration_min',  # Yetkazib berish davomiyligi (delivery_duration_min)
+            'assigned_at',  # Tayinlangan vaqt (assigned_at)
+            'delivered_at',  # Yetkazib berilgan vaqt (delivered_at)
+        ]

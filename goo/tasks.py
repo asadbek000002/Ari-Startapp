@@ -3,11 +3,15 @@ from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.measure import D
 from django.utils.timezone import localtime
 from datetime import datetime
+from django.utils import timezone
 from django.db.models import OuterRef, Subquery, Q, F
 from uuid import UUID
 from celery import shared_task
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from openrouteservice import Client
+from openrouteservice.exceptions import ApiError
+from django.conf import settings
 import json
 import redis
 import time
@@ -16,6 +20,7 @@ from geopy.distance import geodesic
 
 from goo.models import Order, Shop
 from pro.models import DeliverLocation, DeliverProfile
+from user.models import Location
 
 # Redis connection
 # r = redis.StrictRedis(host='localhost', port=6377, db=0)
@@ -150,8 +155,38 @@ def assign_order_to_courier(order, deliver_user_id):
     order.status = "assigned"
     order.save()
 
+    deliver_role = deliver_profile.role
+
     deliver_profile.is_busy = True
     deliver_profile.save(update_fields=["is_busy"])
+
+    # 3. Kuryerning joylashuvi (Redis'dan olingan)
+    data = json.loads(r.get(f"location:{deliver_user_id}"))
+    courier_coords = (float(data['lon']), float(data['lat']))  # lon, lat
+
+    # 4. Do‘kon koordinatalarini olish
+    shop_coords = (order.shop.coordinates.x, order.shop.coordinates.y)  # lon, lat
+
+    # 5. Zakazchi manzili (customer location)
+    customer_location = Location.objects.filter(user=order.user, active=True).first()
+    if not customer_location:
+        return
+    customer_coords = (customer_location.coordinates.x, customer_location.coordinates.y)
+
+    # 6. Marshrutni hisoblash (kuryer -> do‘kon -> zakazchi)
+    distance_km, duration_min = calculate_order_route_info(
+        deliver_coords=courier_coords,
+        shop_coords=shop_coords,
+        customer_coords=customer_coords,
+        deliver_role=deliver_role
+    )
+
+    if distance_km and duration_min:
+        # 7. Buyurtma ma'lumotlarini yangilash
+        order.delivery_distance_km = round(distance_km, 2)
+        order.delivery_duration_min = round(duration_min, 1)
+        order.assigned_at = timezone.now()
+        order.save()
 
     notify_shop_order_taken(order, deliver_user_id)
     notify_deliver_order_taken(order, deliver_profile)
@@ -249,3 +284,48 @@ def save_locations_from_redis():
             print(f"Error updating location for {key}: {e}")
 
     return f"{saved_count} ta location bazaga saqlandi"
+
+
+def calculate_order_route_info(deliver_coords, shop_coords, customer_coords, deliver_role):
+    """
+    3 nuqta asosida (deliver → shop → customer) ORS orqali marshrutni hisoblaydi.
+    :param deliver_coords: (lon, lat) tuple
+    :param shop_coords: (lon, lat) tuple
+    :param customer_coords: (lon, lat) tuple
+    :return: (distance_km, duration_min) yoki (None, None)
+    """
+    try:
+        # OpenRouteService client'ni yaratamiz
+        client = Client(key=settings.ORS_API_KEY)
+
+        # Coordinates ro'yxatini tayyorlaymiz
+        coords = [deliver_coords, shop_coords, customer_coords]
+
+        # Transport turiga qarab profile ni belgilaymiz
+        if deliver_role == 'bike':
+            profile = 'cycling-regular'  # Velosiped
+        else:
+            profile = 'foot-walking'  # Piyoda
+
+        # Marshrutni hisoblash uchun API'ga so'rov yuboramiz
+        route = client.directions(
+            coordinates=coords,
+            profile=profile,  # Kuryer vositasi
+            format='json'
+        )
+
+        # Javobdan summaryni olish
+        summary = route['routes'][0]['summary']
+        distance_km = round(summary['distance'] / 1000, 2)  # masofa km da
+        duration_min = round(summary['duration'] / 60, 1)  # vaqt daqiqa bilan
+
+        # Natijalarni qaytarish
+        return distance_km, duration_min
+
+    except ApiError as e:
+        print(f"ORS API xatosi: {e}")
+    except Exception as e:
+        print(f"ORS umumiy xato: {e}")
+
+    # Agar xato bo'lsa, None qaytarish
+    return None, None

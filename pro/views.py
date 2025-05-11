@@ -5,8 +5,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
-from pro.serializers import ProRegistrationSerializer, DeliverHomeSerializer, DeliverProfileSerializer
+from pro.serializers import ProRegistrationSerializer, DeliverHomeSerializer, DeliverProfileSerializer, \
+    OrderActiveProSerializer
 from .models import DeliverProfile
+from goo.models import Order
 
 User = get_user_model()
 
@@ -71,3 +73,17 @@ class ToggleDeliverActiveView(APIView):
             return Response({"work_active": profile.work_active}, status=200)
         except DeliverProfile.DoesNotExist:
             return Response({"error": "Deliver profile not found"}, status=404)
+
+
+class DeliverOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Zakazchining eng oxirgi "assigned" statusidagi buyurtmasi
+        order = Order.objects.filter(user=request.user, status="assigned").order_by('-created_at').first()
+
+        if order:
+            serializer = OrderActiveProSerializer(order)
+            return Response(serializer.data)
+        else:
+            return Response({"detail": "No active order found."}, status=404)

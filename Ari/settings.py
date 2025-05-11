@@ -246,3 +246,7 @@ MODELTRANSLATION_DEFAULT_LANGUAGE = 'uz'
 CELERY_IMPORTS = (
     "shop.tasks",  # Barcha Celery vazifalari joylashgan papkalarni qo‘shing
 )
+
+
+# settings.py
+ORS_API_KEY = '5b3ce3597851110001cf624810e066d8e48ae82870dc16435e343119622b5141fc32181c7585e930'

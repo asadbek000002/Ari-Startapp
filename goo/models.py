@@ -56,6 +56,11 @@ class Order(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    delivery_distance_km = models.FloatField(null=True, blank=True)
+    delivery_duration_min = models.FloatField(null=True, blank=True)
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+
     def cancel(self, canceled_by, user, reason=None):
         if self.status == "canceled":
             raise ValueError("Order is already canceled.")

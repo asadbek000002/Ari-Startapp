@@ -8,7 +8,6 @@ from django.utils.timezone import now
 
 # r = redis.StrictRedis(host='localhost', port=6377, db=0)
 
-
 r = redis.StrictRedis(host='redis', port=6379, db=0)
 
 
@@ -76,7 +75,7 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
             "work_active": profile.work_active,
             "is_busy": profile.is_busy,
             "timestamp": timestamp
-        }), ex=180)  # 3 daqiqa expiration (optional)
+        }), ex=10800)  # 3 daqiqa expiration (optional)
 
         # Shu yerda siz WebSocket orqali joylashuvni boshqa guruhlarga yuborsangiz ham bo'ladi
         # await self.channel_layer.group_send(

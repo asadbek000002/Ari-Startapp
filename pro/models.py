@@ -7,10 +7,15 @@ from django.conf import settings
 
 # Kuryer ning malumotlari modeli
 class DeliverProfile(models.Model):
+    ROLE_CHOICES = [
+        ('foot', 'Foot'),  # Piyoda
+        ('bike', 'Bike'),  # Velosiped
+    ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="deliver_profile")
     deliver_id = models.CharField(max_length=8, unique=True, editable=False)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    role = models.CharField(max_length=4, choices=ROLE_CHOICES, default='foot')
     work_start = models.TimeField(null=True, blank=True)
     work_end = models.TimeField(null=True, blank=True)
     work_active = models.BooleanField(default=False)
