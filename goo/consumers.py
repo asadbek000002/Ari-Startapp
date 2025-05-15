@@ -8,6 +8,7 @@ from django.utils.timezone import now
 
 # r = redis.StrictRedis(host='localhost', port=6377, db=0)
 
+
 r = redis.StrictRedis(host='redis', port=6379, db=0)
 
 
@@ -42,6 +43,7 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def receive(self, text_data):
+        print("Kelgan xom text_data:", repr(text_data))
         data = json.loads(text_data)
         action = data.get("action")
         order_id = data.get("order_id")
@@ -75,7 +77,7 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
             "work_active": profile.work_active,
             "is_busy": profile.is_busy,
             "timestamp": timestamp
-        }), ex=10800)  # 3 daqiqa expiration (optional)
+        }), ex=10800)  # 3 soat expiration (optional)
 
         # Shu yerda siz WebSocket orqali joylashuvni boshqa guruhlarga yuborsangiz ham bo'ladi
         # await self.channel_layer.group_send(
@@ -87,6 +89,14 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
         #         "lon": lon
         #     }
         # )
+
+        # Faqat ushbu foydalanuvchining o'ziga WebSocket orqali joylashuvni yuborish
+        await self.send(text_data=json.dumps({
+            "type": "location_broadcast",
+            "user_id": str(self.user_id),
+            "lat": lat,
+            "lon": lon
+        }))
 
     async def location_broadcast(self, event):
         await self.send(text_data=json.dumps({
@@ -118,9 +128,22 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
             )
 
     async def reject_order(self, order_id):
+        order = await sync_to_async(Order.objects.get)(id=order_id)
+
+        if order.status != "pending":
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "Buyurtma allaqachon olingan."
+            }))
+            return
+
+        # Redisga rad etilgan kuryer haqida ma'lumot qo'shish
+        r.set(f"order_{order.id}_rejected_by_{self.user_id}", "rejected")
+
+        # Endi bu yerda guruhga yubormaymiz, faqat o'z kanaliga yuboramiz
         await self.send(text_data=json.dumps({
-            "type": "rejected",
-            "order_id": order_id
+            "type": "reject_order",  # Xabar turini belgilash
+            "order_id": order.id,  # Yuborilayotgan order_id
         }))
 
     async def order_taken(self, event):
@@ -131,3 +154,10 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
 
     async def send_notification(self, event):
         await self.send(text_data=json.dumps(event["message"]))
+
+    async def order_direction_update(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "order_direction_update",
+            "order_id": event["order_id"],
+            "direction": event["direction"]
+        }))

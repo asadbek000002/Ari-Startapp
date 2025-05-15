@@ -107,7 +107,7 @@ class OrderActiveProSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'delivered_at', 'customer_info']
+        fields = ['id', 'delivered_at', 'direction', 'customer_info']
 
     def get_customer_info(self, obj):
         request = self.context.get('request')

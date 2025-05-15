@@ -50,3 +50,39 @@ class DeliverLocation(models.Model):
 
     def __str__(self):
         return f"Courier {self.deliver.user.phone_number} - {self.coordinates}"
+
+
+class WeatherData(models.Model):
+    city = models.CharField(max_length=100)
+    temperature = models.FloatField()
+    condition = models.CharField(max_length=50)  # Masalan: 'Rain', 'Clear'
+    wind_speed = models.FloatField()
+    humidity = models.FloatField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.city} - {self.condition} @ {self.timestamp}"
+
+
+class DeliveryPricePolicy(models.Model):
+    TRANSPORT_CHOICES = [
+        ('foot', 'Piyoda'),
+        ('bike', 'Velosiped'),
+    ]
+    transport_type = models.CharField(max_length=10, choices=TRANSPORT_CHOICES)
+    min_distance = models.DecimalField(max_digits=5, decimal_places=2)  # km
+    max_distance = models.DecimalField(max_digits=5, decimal_places=2)  # km
+
+    base_price = models.PositiveIntegerField(help_text="Minimal narx (so'mda)")
+    price_per_km = models.PositiveIntegerField(help_text="1 km uchun narx (so'mda)")
+
+    # Ob-havo koeffitsiyentlari
+    rain_multiplier = models.FloatField(default=1.3)
+    snow_multiplier = models.FloatField(default=1.3)
+    thunderstorm_multiplier = models.FloatField(default=1.3)
+    drizzle_multiplier = models.FloatField(default=1.1)
+    clouds_multiplier = models.FloatField(default=1.1)
+    clear_multiplier = models.FloatField(default=1.0)
+
+    def __str__(self):
+        return f"{self.transport_type.upper()} | {self.min_distance}-{self.max_distance} km"

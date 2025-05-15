@@ -9,6 +9,7 @@ from pro.serializers import ProRegistrationSerializer, DeliverHomeSerializer, De
     OrderActiveProSerializer
 from .models import DeliverProfile
 from goo.models import Order
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -31,6 +32,7 @@ class ProRegistrationView(generics.CreateAPIView):
         }, status=status.HTTP_201_CREATED)
 
 
+# DELIVERNI HOME PAGEDAGI MALUMOTLARI
 class DeliverHomeView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -46,6 +48,7 @@ class DeliverHomeView(APIView):
             return Response({"error": "Deliver profile not found"}, status=404)
 
 
+# KUREYRNI PROFIL OYNASI
 class DeliverProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -62,6 +65,7 @@ class DeliverProfileView(APIView):
             return Response({"error": "Deliver profile not found"}, status=404)
 
 
+# KURYER ISHGA CHIQGAN VAXTI HOLATINI ACITVE QILA OLADI
 class ToggleDeliverActiveView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -75,6 +79,7 @@ class ToggleDeliverActiveView(APIView):
             return Response({"error": "Deliver profile not found"}, status=404)
 
 
+# KURYER ZAKAZNI QABUL QILGANDAN KEYIN OTADIGAN BIRINCHI OYNA
 class DeliverOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -83,7 +88,7 @@ class DeliverOrderView(APIView):
             Order.objects
             .select_related("deliver__user", "user")  # deliver.user va user (customer) ni oldindan olish
             .only(
-                "id", "delivered_at", "user__id", "user__avatar", "user__full_name",
+                "id", "delivered_at", 'direction', "user__id", "user__avatar", "user__full_name",
                 "user__phone_number", "user__rating",  # Zakaz bergan user maydonlari
                 "deliver__user__id"  # Faqat filter uchun kerak
             )
@@ -99,12 +104,11 @@ class DeliverOrderView(APIView):
             return Response({"detail": "No active order found."}, status=404)
 
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 
+# KURYER BORAYOTGAN MANZINI OZGARTRISH UCHUN MISOL UCHUN DOKONGA YETDIM MAHSULOTNI OLDIM
 class CourierOrderDirectionUpdateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -133,4 +137,18 @@ class CourierOrderDirectionUpdateView(APIView):
 
         order.direction = new_direction
         order.save()
+
+        # WebSocket orqali order egasiga (goo userga) habar yuborish
+        channel_layer = get_channel_layer()
+        group_name = f"user_{order.user_id}_goo"
+        print(group_name)
+
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                "type": "order_direction_update",
+                "order_id": order.id,
+                "direction": new_direction
+            }
+        )
         return Response({"detail": "Direction updated", "direction": order.direction})

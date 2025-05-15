@@ -20,6 +20,7 @@ from geopy.distance import geodesic
 
 from goo.models import Order, Shop
 from pro.models import DeliverLocation, DeliverProfile
+from pro.tasks import get_latest_weather_condition, calculate_delivery_price
 from user.models import Location
 
 # Redis connection
@@ -37,6 +38,7 @@ def send_order_to_couriers(order_id, shop_id):
 
     # 1. Redisdan kuryer joylashuvlarini topamiz (so‘nggi 3 daqiqadagi)
     nearby_deliver_ids = []
+    deliver_locations = {}  # ✅ user_id: (lon, lat)
     for key in r.scan_iter(match="location:*"):
         try:
             data = json.loads(r.get(key))
@@ -53,6 +55,7 @@ def send_order_to_couriers(order_id, shop_id):
                 if distance_km <= 5:
                     user_id = UUID(key.decode().split(":")[1])
                     nearby_deliver_ids.append(user_id)
+                    deliver_locations[user_id] = (lon, lat)  # ✅ joylashuvni saqlab qo'yamiz
                     print(f"redis {user_id} ta kuryer topildi.")
                     if len(nearby_deliver_ids) >= 10:
                         break
@@ -70,18 +73,24 @@ def send_order_to_couriers(order_id, shop_id):
     if len(deliver_profiles) < 10:
         remaining_needed = 10 - len(deliver_profiles)
 
+        # Redisdan topilgan user_id lar
+        redis_user_ids = [d.user.id for d in deliver_profiles]
+        print(f"Redisdan topilgan kuryerlar ID: {redis_user_ids}")
+
         latest_location_subquery = DeliverLocation.objects.filter(
             deliver=OuterRef('pk')
         ).order_by('-updated_at').values('id')[:1]
 
         additional_deliver_profiles = DeliverProfile.objects.filter(
-            work_active=True, is_busy=False,
+            work_active=True, is_busy=False
+        ).exclude(
+            user__id__in=redis_user_ids  # 👈 Redisdan topilganlarni chiqarib tashlash
+        ).filter(
             deliver_locations__id__in=Subquery(latest_location_subquery)
         ).annotate(
             distance=Distance('deliver_locations__coordinates', shop.coordinates)
         ).filter(distance__lte=D(km=5)).distinct()[:remaining_needed]
 
-        # Qo‘shimcha topilganlarni deliver_profiles ga qo‘shamiz
         deliver_profiles += list(additional_deliver_profiles)
 
         if additional_deliver_profiles.exists():
@@ -97,20 +106,70 @@ def send_order_to_couriers(order_id, shop_id):
         if r.get(f"order_{order.id}_taken"):
             break
 
-        send_notification_to_deliver(channel_layer, deliver.user.id, order, shop)
+        user_id = deliver.user.id  ##
 
+        # ✅ Avval Redisdan o‘qilgan joylashuv lug‘idan olamiz
+        coords = deliver_locations.get(user_id)  ##
+        if coords:  ##
+            courier_coords = coords  # (lon, lat) ##
+        else:  ##
+            # Redisda topilmagan bo‘lsa — bazadan fallback
+            last_location = DeliverLocation.objects.filter(  ##
+                deliver=deliver  ##
+            ).order_by('-updated_at').first()  ##
+            if not last_location:  ##
+                continue  ##
+            courier_coords = (last_location.coordinates.x, last_location.coordinates.y)  ##
+
+        deliver_role = deliver.role
+
+        # 🆕 2. Do‘kon va mijoz koordinatalari
+        shop_coords = (shop.coordinates.x, shop.coordinates.y)
+        customer_location = Location.objects.filter(user=order.user, active=True).first()
+        if not customer_location:
+            continue
+        customer_coords = (customer_location.coordinates.x, customer_location.coordinates.y)
+
+        # 🆕 3. Masofa, vaqtni hisoblash
+        distance_km, duration_min = calculate_order_route_info(
+            deliver_coords=courier_coords,
+            shop_coords=shop_coords,
+            customer_coords=customer_coords,
+            deliver_role=deliver_role
+        )
+
+        # 🆕 4. Ob-havoni olib, narxni hisoblash
+        weather_condition = get_latest_weather_condition()
+        price = calculate_delivery_price(distance_km, deliver_role, weather_condition)
+
+        # 🆕 5. Narx bilan birga yuborish
+        send_notification_to_deliver(
+            channel_layer,
+            deliver.user.id,
+            order,
+            shop,
+            price=price,
+            distance=round(distance_km, 2),
+            duration=round(duration_min, 1)
+        )
+
+        rejected = False
         for _ in range(20):  # 20 soniya kutish (1s * 20)
             if r.get(f"order_{order.id}_taken"):
                 break
+            if r.get(f"order_{order.id}_rejected_by_{deliver.user.id}"):
+                rejected = True
+                r.delete(f"order_{order.id}_rejected_by_{deliver.user.id}")
+                break
             time.sleep(1)
 
-        if not r.get(f"order_{order.id}_taken"):
+        if not r.get(f"order_{order.id}_taken") and not rejected:
             send_timeout_notification(channel_layer, deliver.user.id, order.id)
 
     # 6. Agar kimdir qabul qilgan bo‘lsa — tayinlaymiz
     taken_by = r.get(f"order_{order.id}_taken")
     if taken_by:
-        assign_order_to_courier(order, taken_by.decode('utf-8'))
+        assign_order_to_courier(order, taken_by.decode('utf-8'), deliver_locations)
         r.delete(f"order_{order.id}_taken")
         return f"Order {order.id} assigned to courier {order.deliver.id}"
 
@@ -121,16 +180,19 @@ def send_order_to_couriers(order_id, shop_id):
 
 # === Helper functions ===
 
-def send_notification_to_deliver(channel_layer, deliver_user_id, order, shop):
+def send_notification_to_deliver(channel_layer, deliver_user_id, order, shop, price=None, distance=None, duration=None):
     async_to_sync(channel_layer.group_send)(
         f"user_{deliver_user_id}_pro",
         {
             "type": "send_notification",
             "message": {
+                "details": "Yangi buyurtma mavjud.",
                 "order_id": order.id,
                 "shop": shop.title,
-                "coordinates": (shop.coordinates.x, shop.coordinates.y),
-                "details": "Yangi buyurtma mavjud."
+                "price": price,
+                "distance_km": distance,
+                "duration_min": duration,
+                "order_items": order.items,
             }
         }
     )
@@ -149,7 +211,7 @@ def send_timeout_notification(channel_layer, deliver_user_id, order_id):
     )
 
 
-def assign_order_to_courier(order, deliver_user_id):
+def assign_order_to_courier(order, deliver_user_id, deliver_locations=None):
     deliver_profile = DeliverProfile.objects.get(user_id=deliver_user_id)
     order.deliver = deliver_profile
     order.status = "assigned"
@@ -161,8 +223,21 @@ def assign_order_to_courier(order, deliver_user_id):
     deliver_profile.save(update_fields=["is_busy"])
 
     # 3. Kuryerning joylashuvi (Redis'dan olingan)
-    data = json.loads(r.get(f"location:{deliver_user_id}"))
-    courier_coords = (float(data['lon']), float(data['lat']))  # lon, lat
+    if deliver_locations:
+        coords = deliver_locations.get(UUID(deliver_user_id))
+    else:
+        coords = None
+
+    if coords:
+        courier_coords = coords
+    else:
+        # fallback: bazadan oxirgi joylashuv
+        last_location = DeliverLocation.objects.filter(
+            deliver=deliver_profile
+        ).order_by('-updated_at').first()
+        if not last_location:
+            return
+        courier_coords = (last_location.coordinates.x, last_location.coordinates.y)
 
     # 4. Do‘kon koordinatalarini olish
     shop_coords = (order.shop.coordinates.x, order.shop.coordinates.y)  # lon, lat
@@ -182,11 +257,26 @@ def assign_order_to_courier(order, deliver_user_id):
     )
 
     if distance_km and duration_min:
+        # 8. Ob-havo holatini olish
+        weather_condition = get_latest_weather_condition()
+
+        # 9. Narxni hisoblash
+        price = calculate_delivery_price(distance_km, deliver_role, weather_condition)
+
         # 7. Buyurtma ma'lumotlarini yangilash
         order.delivery_distance_km = round(distance_km, 2)
         order.delivery_duration_min = round(duration_min, 1)
+        order.weather_condition = weather_condition
+        order.delivery_price = price
         order.assigned_at = timezone.now()
         order.save()
+        # if price:
+        #     print("Masofa (km):", distance_km)
+        #     print("Vaqt (min):", duration_min)
+        #     print("Ob-havo:", weather_condition)
+        #     print("Hisoblangan narx (so'm):", price)
+        # else:
+        #     print("Hisoblashda xatolik yuz berdi.")
 
     notify_shop_order_taken(order, deliver_user_id)
     notify_deliver_order_taken(order, deliver_profile)

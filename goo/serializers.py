@@ -207,7 +207,7 @@ class OrderActiveGooSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'delivered_at', 'deliver_user']
+        fields = ['id', 'delivered_at', "direction", 'deliver_user']
 
     def get_deliver_user(self, obj):
         if obj.deliver and hasattr(obj.deliver, 'user'):

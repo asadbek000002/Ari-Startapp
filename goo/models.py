@@ -71,6 +71,9 @@ class Order(models.Model):
     assigned_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
 
+    weather_condition = models.CharField(max_length=255, null=True, blank=True)
+    delivery_price = models.PositiveIntegerField(null=True, blank=True)
+
     picked_up_at = models.DateTimeField(null=True, blank=True)
 
     def cancel(self, canceled_by, user, reason=None):

@@ -1,6 +1,8 @@
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
-
+from django.http import HttpResponseForbidden
+from django.http import JsonResponse
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import RetrieveAPIView, UpdateAPIView, CreateAPIView
@@ -11,8 +13,10 @@ from rest_framework import status
 from goo.models import Contact, Order
 from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
     LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer, \
-    OrderActiveGooSerializer
+    OrderActiveGooSerializer, CancelOrderSerializer
 from user.models import Location
+
+from goo.tasks import send_order_to_couriers
 
 User = get_user_model()
 
@@ -115,10 +119,7 @@ class LatestContactView(RetrieveAPIView):
         return Contact.objects.latest('id')  # Eng oxirgi qo‘shilgan ma’lumotni olish
 
 
-# goo da zakazchik zakaz berish uchun mahsulatlarga
-from goo.tasks import send_order_to_couriers
-
-
+# ORDER YARATADIGAN OYNA
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_order(request, shop_id):
@@ -136,6 +137,7 @@ def create_order(request, shop_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# ORDER MALUMOTLARINI YANIY DOMOFON UY RAQAMLARINI TOLDRADIGAN OYNA
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def update_order(request, order_id):
@@ -159,6 +161,7 @@ def update_order(request, order_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# KURYER TOPILMAGANDA QAYTA KURYER QIDIRISH OYNASI
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def retry_order_delivery(request, order_id):
@@ -173,12 +176,7 @@ def retry_order_delivery(request, order_id):
     return Response({"detail": "Buyurtma kuryerlarga qayta yuborildi."})
 
 
-from django.http import JsonResponse
-
-from .serializers import CancelOrderSerializer
-from django.http import HttpResponseForbidden
-
-
+# ORDERNI OTKAZ QILISHI UCHUN CHIQARILGAN OYNA
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def cancel_order(request, order_id):
@@ -220,14 +218,7 @@ def cancel_order(request, order_id):
     })
 
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-
-from .models import Order
-from .serializers import OrderSerializer
-
-
+# ZAKAZCHIK KURYERNI TOPGANDAN KEYIN OTADIGAN BIRINCHI OYNASI
 class CustomerOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -237,6 +228,7 @@ class CustomerOrderView(APIView):
             .select_related('deliver__user')
             .only(
                 'id', 'delivered_at',
+                'direction',
                 'deliver__user__id',
                 'deliver__user__avatar',
                 'deliver__user__full_name',
