@@ -229,6 +229,7 @@ class CustomerOrderView(APIView):
             .only(
                 'id', 'delivered_at',
                 'direction',
+                'delivery_duration_min',
                 'deliver__user__id',
                 'deliver__user__avatar',
                 'deliver__user__full_name',
