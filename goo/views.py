@@ -2,6 +2,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.http import HttpResponseForbidden
 from django.http import JsonResponse
+from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
@@ -82,6 +83,15 @@ def detail_location(request, location_id):
 
     serializer = LocationUpdateSerializer(location)
     return Response(serializer.data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_location(request, location_id):
+    user = request.user
+    location = get_object_or_404(Location, id=location_id, user=user)
+    location.delete()
+    return Response({"status": "success delete"}, status=HTTP_200_OK)
 
 
 @api_view(['GET'])

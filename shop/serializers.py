@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from shop.models import Shop, ShopRole
 from django.utils.translation import get_language
 import random
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
 
+from shop.models import Shop, ShopRole, Advertising
 from user.models import UserRole, VerificationCode
 
 User = get_user_model()
@@ -170,3 +170,20 @@ class ShopDetailSerializer(serializers.ModelSerializer):
     def get_locations(self, obj):
         lang = get_language()
         return getattr(obj, f"locations_{lang}", obj.locations_uz)  # Default: locations_uz
+
+
+class AdvertisingSerializer(serializers.ModelSerializer):
+    title = serializers.SerializerMethodField()
+    text = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Advertising
+        fields = ['id', 'image', 'title', 'text', 'link', 'created_at']
+
+    def get_title(self, obj):
+        lang = get_language()
+        return getattr(obj, f"title_{lang}", obj.title_uz)
+
+    def get_text(self, obj):
+        lang = get_language()
+        return getattr(obj, f"text_{lang}", obj.text_uz)

@@ -10,10 +10,11 @@ from rest_framework.generics import CreateAPIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 
-from shop.models import Shop, ShopRole
+from shop.models import Shop, ShopRole, Advertising
 from user.models import Location
 from shop.serializers import (ShopFeaturedSerializer, ShopListSerializer, ShopMapListSerializer,
-                              ShopDetailSerializer, ShopRoleSerializer, ShopRegistrationSerializer)
+                              ShopDetailSerializer, ShopRoleSerializer, ShopRegistrationSerializer,
+                              AdvertisingSerializer)
 
 User = get_user_model()
 
@@ -148,3 +149,13 @@ def shop_detail(request, pk):
         return Response(serializer.data)
     except Shop.DoesNotExist:
         return Response({"error": "Shop not found"}, status=404)
+
+
+@api_view(["GET"])
+def advertising_list(request):
+    try:
+        advertising = Advertising.objects.all()
+        serializer = AdvertisingSerializer(advertising, many=True, context=({"request": request}))
+        return Response(serializer.data)
+    except Advertising.DoesNotExist:
+        return Response({"error": "Advertising not found"}, status=404)
