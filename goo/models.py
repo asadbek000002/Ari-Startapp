@@ -53,6 +53,7 @@ class Order(models.Model):
     has_intercom = models.BooleanField(default=False)  # kerak emas
     intercom_code = models.CharField(max_length=20, blank=True, null=True)
     additional_note = models.TextField(max_length=250, blank=True, null=True)
+    item_price = models.PositiveIntegerField(null=True, blank=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
 

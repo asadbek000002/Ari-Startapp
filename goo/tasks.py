@@ -24,7 +24,7 @@ from pro.tasks import get_latest_weather_condition, calculate_delivery_price
 from user.models import Location
 
 # Redis connection
-# r = redis.StrictRedis(host='localhost', port=6377, db=0)
+# r = redis.StrictRedis(host='localhost', port=6371, db=0)
 
 
 r = redis.StrictRedis(host='redis', port=6379, db=0)
@@ -103,7 +103,9 @@ def send_order_to_couriers(order_id, shop_id):
 
     # 5. Buyurtmani yuboramiz — 10 ta kuryerga ketma-ket
     for deliver in deliver_profiles[:10]:
+        print(f"[🔄] {deliver.user.id=} - {deliver.user.id} kuryerga order yuboriladi...")
         if r.get(f"order_{order.id}_taken"):
+            print(f"[⛔️] Order {order.id} allaqachon olingan. Loop break.")
             break
 
         user_id = deliver.user.id  ##
@@ -120,13 +122,14 @@ def send_order_to_couriers(order_id, shop_id):
             if not last_location:  ##
                 continue  ##
             courier_coords = (last_location.coordinates.x, last_location.coordinates.y)  ##
-
+            print(f"[📍] Bazadan oxirgi joylashuv olindi: {courier_coords}")
         deliver_role = deliver.role
 
         # 🆕 2. Do‘kon va mijoz koordinatalari
         shop_coords = (shop.coordinates.x, shop.coordinates.y)
         customer_location = Location.objects.filter(user=order.user, active=True).first()
         if not customer_location:
+            print(f"[❌] Buyurtmachining joylashuvi topilmadi.")
             continue
         customer_coords = (customer_location.coordinates.x, customer_location.coordinates.y)
 
@@ -141,7 +144,7 @@ def send_order_to_couriers(order_id, shop_id):
         # 🆕 4. Ob-havoni olib, narxni hisoblash
         weather_condition = get_latest_weather_condition()
         price = calculate_delivery_price(distance_km, deliver_role, weather_condition)
-
+        print(f"[📦] {user_id=} kuryerga order yuborilmoqda...")
         # 🆕 5. Narx bilan birga yuborish
         send_notification_to_deliver(
             channel_layer,
@@ -152,7 +155,7 @@ def send_order_to_couriers(order_id, shop_id):
             distance=round(distance_km, 2),
             duration=round(duration_min, 1)
         )
-
+        print(f"[⏳] Kuryer {user_id=} dan javob kutilyapti...")
         rejected = False
         for _ in range(20):  # 20 soniya kutish (1s * 20)
             if r.get(f"order_{order.id}_taken"):

@@ -178,7 +178,7 @@ class AdvertisingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Advertising
-        fields = ['id', 'image', 'title', 'text', 'link', 'created_at']
+        fields = ['id', 'shop', 'image', 'title', 'text', 'link', 'created_at']
 
     def get_title(self, obj):
         lang = get_language()

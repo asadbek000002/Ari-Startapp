@@ -5,6 +5,7 @@ from django.contrib.gis.measure import D
 from geopy.geocoders import Nominatim
 
 from goo.models import Order, Contact
+from pro.models import DeliverProfile
 from shop.models import Shop
 from user.models import UserRole, VerificationCode, Location
 from django.contrib.auth import get_user_model
@@ -178,7 +179,20 @@ class OrderUpdateSerializer(serializers.ModelSerializer):
             "house_number",
             "apartment_number",
             "floor",
-            "has_intercom",
+            "intercom_code",
+            "additional_note",
+        ]
+
+
+class RetryUpdateOrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = [
+            "items",
+            "allow_other_shops",
+            "house_number",
+            "apartment_number",
+            "floor",
             "intercom_code",
             "additional_note",
         ]
@@ -189,55 +203,81 @@ class CancelOrderSerializer(serializers.Serializer):
 
 
 class DeliverUserInfoSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source='user.id')
+    full_name = serializers.CharField(source='user.full_name')
+    phone_number = serializers.CharField(source='user.phone_number')
+    rating = serializers.FloatField(source='user.rating')
     avatar = serializers.SerializerMethodField()
+    role = serializers.CharField()  # deliver_profile.role
 
     class Meta:
-        model = User
-        fields = ['id', 'avatar', 'full_name', 'phone_number', 'rating']
+        model = DeliverProfile
+        fields = ['id', 'full_name', 'phone_number', 'rating', 'avatar', 'role']
 
     def get_avatar(self, obj):
         request = self.context.get('request')
-        if obj.avatar and hasattr(obj.avatar, 'url'):
-            return request.build_absolute_uri(obj.avatar.url)
+        avatar = obj.user.avatar
+        if avatar and hasattr(avatar, 'url'):
+            return request.build_absolute_uri(avatar.url)
         return None
 
 
 class OrderActiveGooSerializer(serializers.ModelSerializer):
-    deliver_user = serializers.SerializerMethodField()
+    deliver_user = DeliverUserInfoSerializer(source='deliver', read_only=True)
+    customer_location = serializers.SerializerMethodField()
+    shop_location = serializers.SerializerMethodField()
+    courier_location = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
-        fields = ['id', 'delivered_at', "direction", 'deliver_user', 'delivery_duration_min']
+        fields = [
+            'id',
+            'delivery_price',
+            'assigned_at',
+            'direction',
+            'delivery_duration_min',
+            'deliver_user',
+            'customer_location',
+            'shop_location',
+            'courier_location',
 
-    def get_deliver_user(self, obj):
-        if obj.deliver and hasattr(obj.deliver, 'user'):
-            return DeliverUserInfoSerializer(obj.deliver.user, context=self.context).data
+        ]
+
+    def get_customer_location(self, obj):
+        location = obj.user.locations.filter(active=True).first()
+        if location:
+            return {
+                "latitude": location.coordinates.y,
+                "longitude": location.coordinates.x,
+                "address": location.address,
+            }
         return None
 
-# class OrderActiveGooSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Order
-#         fields = [
-#             'id',  # Zakaz ID
-#             'user',  # Foydalanuvchi (user)
-#             'shop',  # Do'kon (shop)
-#             'deliver',  # Yetkazib beruvchi (deliver)
-#             'items',  # Mahsulotlar ro'yxati (items)
-#             'allow_other_shops',  # Boshqa do'konlardan olib kelish (allow_other_shops)
-#             'house_number',  # Uy raqami (house_number)
-#             'apartment_number',  # Kvartira raqami (apartment_number)
-#             'floor',  # Qavat (floor)
-#             'has_intercom',  # Interkom mavjudligi (has_intercom)
-#             'intercom_code',  # Interkom kodi (intercom_code)
-#             'additional_note',  # Qo'shimcha izoh (additional_note)
-#             'status',  # Zakaz holati (status)
-#             'canceled_by_user',  # Zakazni bekor qilgan foydalanuvchi (canceled_by_user)
-#             'canceled_by',  # Zakazni bekor qilgan shaxs (canceled_by)
-#             'cancel_reason',  # Bekor qilish sababi (cancel_reason)
-#             'canceled_at',  # Bekor qilingan vaqt (canceled_at)
-#             'created_at',  # Zakaz yaratish vaqti (created_at)
-#             'delivery_distance_km',  # Yetkazib berish masofasi (delivery_distance_km)
-#             'delivery_duration_min',  # Yetkazib berish davomiyligi (delivery_duration_min)
-#             'assigned_at',  # Tayinlangan vaqt (assigned_at)
-#             'delivered_at',  # Yetkazib berilgan vaqt (delivered_at)
-#         ]
+    def get_shop_location(self, obj):
+        if obj.shop and obj.shop.coordinates:
+            return {
+                "latitude": obj.shop.coordinates.y,
+                "longitude": obj.shop.coordinates.x,
+                "title": obj.shop.title,
+            }
+        return None
+
+    def get_courier_location(self, obj):
+        if obj.deliver:
+            courier_loc = obj.deliver.deliver_locations.order_by('-updated_at').first()
+            if courier_loc:
+                return {
+                    "latitude": courier_loc.coordinates.y,
+                    "longitude": courier_loc.coordinates.x,
+                    "updated_at": courier_loc.updated_at,
+                }
+        return None
+
+
+class PendingOrderSerializer(serializers.ModelSerializer):
+    shop_title = serializers.CharField(source='shop.title')
+    shop_id = serializers.CharField(source='shop.id')
+
+    class Meta:
+        model = Order
+        fields = ['id', 'shop_title', 'shop_id', 'items', 'created_at']

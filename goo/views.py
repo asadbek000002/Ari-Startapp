@@ -14,7 +14,7 @@ from rest_framework import status
 from goo.models import Contact, Order
 from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
     LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer, \
-    OrderActiveGooSerializer, CancelOrderSerializer
+    OrderActiveGooSerializer, CancelOrderSerializer, PendingOrderSerializer, RetryUpdateOrderSerializer
 from user.models import Location
 
 from goo.tasks import send_order_to_couriers
@@ -150,7 +150,7 @@ def create_order(request, shop_id):
 # ORDER MALUMOTLARINI YANIY DOMOFON UY RAQAMLARINI TOLDRADIGAN OYNA
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
-def update_order(request, order_id):
+def address_order(request, order_id):
     """Orderni yangilash (faqat manzil bo‘yicha) va courierlarga yuborish"""
     try:
         order = Order.objects.get(id=order_id, user=request.user, status="pending")
@@ -159,13 +159,31 @@ def update_order(request, order_id):
                         status=status.HTTP_404_NOT_FOUND)
 
     serializer = OrderUpdateSerializer(order, data=request.data, partial=True)
-
     if serializer.is_valid():
         serializer.save()
-
         # Celery taskni shu yerda chaqiramiz
         send_order_to_couriers.delay(order.id, order.shop.id)
+        return Response(OrderSerializer(order).data)
 
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ORDER MALUMOTLARINI YANIY DOMOFON UY RAQAMLARINI TOLDRADIGAN OYNA
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_and_retry_order(request, order_id):
+    """Orderni yangilash (faqat manzil bo‘yicha) va courierlarga yuborish"""
+    try:
+        order = Order.objects.get(id=order_id, user=request.user, status="pending")
+    except Order.DoesNotExist:
+        return Response({"detail": "Buyurtma topilmadi yoki uni o‘zgartirish mumkin emas."},
+                        status=status.HTTP_404_NOT_FOUND)
+
+    serializer = RetryUpdateOrderSerializer(order, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        # Celery taskni shu yerda chaqiramiz
+        send_order_to_couriers.delay(order.id, order.shop.id)
         return Response(OrderSerializer(order).data)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -228,31 +246,51 @@ def cancel_order(request, order_id):
     })
 
 
-# ZAKAZCHIK KURYERNI TOPGANDAN KEYIN OTADIGAN BIRINCHI OYNASI
 class CustomerOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         order = (
             Order.objects
-            .select_related('deliver__user')
+            .select_related('deliver__user', 'shop')
+            .prefetch_related('deliver__deliver_locations', 'user__locations')
+            .filter(user=request.user, status="assigned", assigned_at__isnull=False)
+            .order_by('-assigned_at')
             .only(
-                'id', 'delivered_at',
+                'id', 'delivery_price',
+                'assigned_at',
                 'direction',
                 'delivery_duration_min',
+                'deliver__role',
                 'deliver__user__id',
                 'deliver__user__avatar',
                 'deliver__user__full_name',
                 'deliver__user__phone_number',
                 'deliver__user__rating',
+                'shop__title',
+                'shop__coordinates',
             )
-            .filter(user=request.user, status="assigned")
-            .order_by('-created_at')
             .first()
         )
 
-        if order:
-            serializer = OrderActiveGooSerializer(order, context={'request': request})
-            return Response(serializer.data)
-        else:
+        if not order:
             return Response({"detail": "No active order found."}, status=404)
+
+        serializer = OrderActiveGooSerializer(order, context={'request': request})
+        return Response(serializer.data)
+
+
+class PendingOrdersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        orders = (
+            Order.objects
+            .filter(user=request.user, status="pending")
+            .select_related("shop")
+            .only("id", "shop__title", "shop__id", "items", "created_at")
+            .order_by("-created_at")
+        )
+
+        serializer = PendingOrderSerializer(orders, many=True)
+        return Response(serializer.data)

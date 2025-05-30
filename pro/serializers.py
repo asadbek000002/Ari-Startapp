@@ -104,14 +104,57 @@ class CustomerUserInfoSerializer(serializers.ModelSerializer):
 
 class OrderActiveProSerializer(serializers.ModelSerializer):
     customer_info = serializers.SerializerMethodField()
+    customer_location = serializers.SerializerMethodField()
+    shop_location = serializers.SerializerMethodField()
+    courier_location = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
-        fields = ['id', 'delivered_at', 'direction', 'customer_info']
+        fields = [
+            'id',
+            'delivery_price',
+            'assigned_at',
+            'direction',
+            'delivery_duration_min',
+            'customer_info',
+            'customer_location',
+            'shop_location',
+            'courier_location',
+        ]
 
     def get_customer_info(self, obj):
         request = self.context.get('request')
         return CustomerUserInfoSerializer(obj.user, context={'request': request}).data
+
+    def get_customer_location(self, obj):
+        location = obj.user.locations.filter(active=True).first()
+        if location:
+            return {
+                "latitude": location.coordinates.y,
+                "longitude": location.coordinates.x,
+                "address": location.address,
+            }
+        return None
+
+    def get_shop_location(self, obj):
+        if obj.shop and obj.shop.coordinates:
+            return {
+                "latitude": obj.shop.coordinates.y,
+                "longitude": obj.shop.coordinates.x,
+                "title": obj.shop.title,
+            }
+        return None
+
+    def get_courier_location(self, obj):
+        if obj.deliver:
+            courier_loc = obj.deliver.deliver_locations.order_by('-updated_at').first()
+            if courier_loc:
+                return {
+                    "latitude": courier_loc.coordinates.y,
+                    "longitude": courier_loc.coordinates.x,
+                    "updated_at": courier_loc.updated_at,
+                }
+        return None
 
 # class OrderActiveProSerializer(serializers.ModelSerializer):
 #     class Meta:
