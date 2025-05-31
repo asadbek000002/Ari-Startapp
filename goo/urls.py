@@ -2,7 +2,8 @@ from django.urls import path
 
 from goo.views import GooRegistrationView, list_locations, LocationCreateView, create_order, update_location, \
     detail_location, active_location, UserProfileView, UpdateUserView, LatestContactView, address_order, \
-    retry_order_delivery, cancel_order, CustomerOrderView, delete_location, PendingOrdersView, update_and_retry_order
+    retry_order_delivery, cancel_order_by_customer, CustomerOrderView, delete_location, PendingOrdersView, \
+    update_and_retry_order
 
 urlpatterns = [
     path('register/', GooRegistrationView.as_view(), name='goo-register'),
@@ -20,15 +21,16 @@ urlpatterns = [
     path('contact/', LatestContactView.as_view(), name='latest-contact'),
 
     path("create_order/<int:shop_id>/", create_order, name="create-order"),
-    path("orders/<int:order_id>/address/", address_order, name="address_order"), # ozgartrildi
-    path("orders/<int:order_id>/retry-update/", update_and_retry_order, name="retry_update"), # yangi qoshildi orderni qayta tahrirlab qayta kuryer izlatish
+    path("orders/<int:order_id>/address/", address_order, name="address_order"),  # ozgartrildi
+    path("orders/<int:order_id>/retry-update/", update_and_retry_order, name="retry_update"),
+    # yangi qoshildi orderni qayta tahrirlab qayta kuryer izlatish
 
     path("orders/<int:order_id>/retry/", retry_order_delivery, name="update_order"),
 
-    path('order/<int:order_id>/cancel/', cancel_order, name='cancel_order_goo'),
+    path('order/<int:order_id>/cancel/', cancel_order_by_customer, name='cancel_order_goo'),
 
     path('orders/active/', CustomerOrderView.as_view(), name='courier-orders'),
 
-    path('orders/pending/', PendingOrdersView.as_view(), name='pending-orders'),
+    path('orders/pending-searching/', PendingOrdersView.as_view(), name='pending-orders'),
 
 ]

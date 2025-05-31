@@ -1,12 +1,16 @@
 from django.shortcuts import render, get_object_or_404
+from rest_framework.decorators import permission_classes, api_view
 from rest_framework.views import APIView
 from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 from django.contrib.auth import get_user_model
 from pro.serializers import ProRegistrationSerializer, DeliverHomeSerializer, DeliverProfileSerializer, \
-    OrderActiveProSerializer
+    OrderActiveProSerializer, CancelProOrderSerializer
 from .models import DeliverProfile
 from goo.models import Order
 from django.utils import timezone
@@ -111,8 +115,55 @@ class DeliverOrderView(APIView):
         return Response(serializer.data)
 
 
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cancel_order_by_courier(request, order_id):
+    """
+    Kuryerning (pro) buyurtmani bekor qilishi.
+    """
+    try:
+        order = Order.objects.select_related('deliver__user').get(id=order_id, deliver__user=request.user)
+    except Order.DoesNotExist:
+        return Response({'detail': 'Buyurtma topilmadi yoki sizga biriktirilmagan.'}, status=404)
+
+    serializer = CancelProOrderSerializer(data=request.data)
+    if serializer.is_valid():
+        reason = serializer.validated_data.get('reason', 'Sababsiz bekor qilindi')
+    else:
+        reason = 'Sababsiz bekor qilindi'
+
+    if order.status in ['completed', 'canceled']:
+        return Response({'detail': 'Bu buyurtma allaqachon yakunlangan yoki bekor qilingan.'}, status=400)
+
+    order.status = 'canceled'
+    order.canceled_by = 'pro'
+    order.cancel_reason = reason
+    order.canceled_by_user = request.user
+    order.canceled_at = timezone.now()
+    order.save()
+
+    order.deliver.is_busy = False
+    order.deliver.save(update_fields=['is_busy'])
+
+    channel_layer = get_channel_layer()
+    group_name = f"user_{order.user_id}_goo"
+    if group_name:
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                "type": "send_notification",
+                "message": {
+                    "type": "order_canceled",
+                    "order_id": order.id,
+                    "canceled_by": order.canceled_by,
+                    "reason": reason,
+                }
+            }
+        )
+    return Response({
+        'status': 'success',
+        'reason': reason
+    }, status=200)
 
 
 # KURYER BORAYOTGAN MANZINI OZGARTRISH UCHUN MISOL UCHUN DOKONGA YETDIM MAHSULOTNI OLDIM

@@ -1,7 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
-from django.http import HttpResponseForbidden
-from django.http import JsonResponse
+from django.utils import timezone
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -10,11 +9,13 @@ from rest_framework.generics import RetrieveAPIView, UpdateAPIView, CreateAPIVie
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 from goo.models import Contact, Order
 from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
     LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer, \
-    OrderActiveGooSerializer, CancelOrderSerializer, PendingOrderSerializer, RetryUpdateOrderSerializer
+    OrderActiveGooSerializer, CancelGooOrderSerializer, PendingSearchingOrderSerializer, RetryUpdateOrderSerializer
 from user.models import Location
 
 from goo.tasks import send_order_to_couriers
@@ -168,7 +169,7 @@ def address_order(request, order_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# ORDER MALUMOTLARINI YANIY DOMOFON UY RAQAMLARINI TOLDRADIGAN OYNA
+# ORDER MALUMOTLARINI VA DOMOFON UY RAQAMLARINI TOLDRADIGAN OYNA
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def update_and_retry_order(request, order_id):
@@ -207,43 +208,59 @@ def retry_order_delivery(request, order_id):
 # ORDERNI OTKAZ QILISHI UCHUN CHIQARILGAN OYNA
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def cancel_order(request, order_id):
-    # URL'ga qarab ro'lni aniqlash
-    if 'goo' in request.path:
-        canceled_by = 'goo'  # Zakazchi (Customer)
-    elif 'pro' in request.path:
-        canceled_by = 'pro'  # Kuryer (Courier)
-    else:
-        return HttpResponseForbidden("Invalid role in URL")  # Noto'g'ri URL
-
-    # Order'ni olish
-    order = get_object_or_404(Order, id=order_id)
-
-    # Serializer yordamida reason (izoh)ni olish
-    serializer = CancelOrderSerializer(data=request.data)
-    if serializer.is_valid():
-        reason = serializer.validated_data.get('reason', 'No reason provided')
-    else:
-        reason = 'No reason provided'
-
-    # Orderni bekor qilish
+def cancel_order_by_customer(request, order_id):
+    """
+    Zakazchini (goo) buyurtmani bekor qilishi.
+    """
+    # Faqat foydalanuvchi o‘zi bergan zakazni bekor qila oladi
     try:
-        order.cancel(canceled_by=canceled_by, user=request.user, reason=reason)
-    except ValueError as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        order = Order.objects.get(id=order_id, user=request.user)
+    except Order.DoesNotExist:
+        return Response({'detail': 'Buyurtma topilmadi yoki sizga tegishli emas.'}, status=404)
 
-        # Agar kuryer bekor qilgan bo‘lsa, u yana available bo'lishi kerak
-    if order.deliver:
-        deliver_profile = order.deliver
-        deliver_profile.is_busy = False
-        deliver_profile.save(update_fields=["is_busy"])
+    # Mahsulot olib ketilgan bo‘lsa — bekor qilib bo‘lmaydi
+    if order.direction == 'picked_up':
+        return Response({'detail': 'Buyurtma allaqachon olib ketilgan. Endi bekor qilib bo‘lmaydi.'}, status=400)
 
-    return JsonResponse({
+    if order.status in ['completed', 'canceled']:
+        return Response({'detail': 'Bu buyurtma allaqachon yakunlangan yoki bekor qilingan.'}, status=400)
+
+    serializer = CancelGooOrderSerializer(data=request.data)
+    if serializer.is_valid():
+        reason = serializer.validated_data.get('reason', 'Sababsiz bekor qilindi')
+    else:
+        reason = 'Sababsiz bekor qilindi'
+
+    order.status = 'canceled'
+    order.canceled_by = 'goo'
+    order.cancel_reason = reason
+    order.canceled_by_user = request.user
+    order.canceled_at = timezone.now()
+    order.save()
+
+    order.deliver.is_busy = False
+    order.deliver.save(update_fields=['is_busy'])
+
+    channel_layer = get_channel_layer()
+    group_name = f"user_{order.deliver.user_id}_pro"
+    if group_name:
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                "type": "send_notification",
+                "message": {
+                    "type": "order_canceled",
+                    "order_id": order.id,
+                    "canceled_by": order.canceled_by,
+                    "reason": reason,
+                }
+            }
+        )
+
+    return Response({
         'status': 'success',
-        'message': f'Order {order.id} has been canceled by {canceled_by}.',
-        'canceled_by_user': request.user.id,
         'reason': reason
-    })
+    }, status=200)
 
 
 class CustomerOrderView(APIView):
@@ -286,11 +303,11 @@ class PendingOrdersView(APIView):
     def get(self, request):
         orders = (
             Order.objects
-            .filter(user=request.user, status="pending")
+            .filter(user=request.user, status__in=["pending", "searching"])
             .select_related("shop")
             .only("id", "shop__title", "shop__id", "items", "created_at")
             .order_by("-created_at")
         )
 
-        serializer = PendingOrderSerializer(orders, many=True)
+        serializer = PendingSearchingOrderSerializer(orders, many=True)
         return Response(serializer.data)

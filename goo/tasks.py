@@ -24,7 +24,7 @@ from pro.tasks import get_latest_weather_condition, calculate_delivery_price
 from user.models import Location
 
 # Redis connection
-# r = redis.StrictRedis(host='localhost', port=6371, db=0)
+# r = redis.StrictRedis(host='localhost', port=6377, db=0)
 
 
 r = redis.StrictRedis(host='redis', port=6379, db=0)
@@ -35,6 +35,10 @@ def send_order_to_couriers(order_id, shop_id):
     order = Order.objects.get(id=order_id)
     shop = Shop.objects.get(id=shop_id)
     channel_layer = get_channel_layer()
+    if order.status != "assigned":
+        order.status = "searching"
+        order.save(update_fields=["status"])
+        send_order_status_to_customer(channel_layer, order)
 
     # 1. Redisdan kuryer joylashuvlarini topamiz (so‘nggi 3 daqiqadagi)
     nearby_deliver_ids = []
@@ -176,8 +180,11 @@ def send_order_to_couriers(order_id, shop_id):
         r.delete(f"order_{order.id}_taken")
         return f"Order {order.id} assigned to courier {order.deliver.id}"
 
-    # 7. Hech kim olmaydigan bo‘lsa — zakazchiga xabar
-    notify_customer_no_courier_found(channel_layer, order)
+    # 7. Hech kim olmaydigan bo‘lsa — zakazchiga xabar va statusni qaytarish
+    order.status = "pending"  # yoki 'no_courier_found' agar yangi status bo‘lsa
+    order.save(update_fields=["status"])
+    send_order_status_to_customer(channel_layer, order, failed=True)
+    # notify_customer_no_courier_found(channel_layer, order)
     return f"Order {order.id} was not accepted by any courier."
 
 
@@ -377,6 +384,31 @@ def save_locations_from_redis():
             print(f"Error updating location for {key}: {e}")
 
     return f"{saved_count} ta location bazaga saqlandi"
+
+
+# ZAKAZCHIGA KURYER IZLASH JARAYONI VA TOPILMMAGANINI HOME PAGEDA BILDRIB TURISH
+def send_order_status_to_customer(channel_layer, order, failed=False):
+    if order.user and hasattr(order.user, "id"):
+        channel_layer = get_channel_layer()
+        group_name = f"user_{order.user.id}_goo"
+
+        order_data = {
+            "type": "searching" if not failed else "kuryer_topilmadi",
+            "id": str(order.id),
+            "shop_title": order.shop.title,
+            "shop_id": str(order.shop.id),
+            "items": order.items,
+            "created_at": order.created_at.isoformat(),
+            "status": order.status,
+        }
+
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                "type": "send_notification",
+                "message": order_data
+            }
+        )
 
 
 def calculate_order_route_info(deliver_coords, shop_coords, customer_coords, deliver_role):

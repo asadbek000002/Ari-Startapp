@@ -198,7 +198,7 @@ class RetryUpdateOrderSerializer(serializers.ModelSerializer):
         ]
 
 
-class CancelOrderSerializer(serializers.Serializer):
+class CancelGooOrderSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
 
 
@@ -274,10 +274,10 @@ class OrderActiveGooSerializer(serializers.ModelSerializer):
         return None
 
 
-class PendingOrderSerializer(serializers.ModelSerializer):
+class PendingSearchingOrderSerializer(serializers.ModelSerializer):
     shop_title = serializers.CharField(source='shop.title')
     shop_id = serializers.CharField(source='shop.id')
 
     class Meta:
         model = Order
-        fields = ['id', 'shop_title', 'shop_id', 'items', 'created_at']
+        fields = ['id', 'order_code', 'shop_title', 'shop_id', 'items', 'created_at', 'status']

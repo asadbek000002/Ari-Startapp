@@ -6,7 +6,7 @@ from goo.models import Order, DeliverProfile
 from django.utils.timezone import localtime
 from django.utils.timezone import now
 
-# r = redis.StrictRedis(host='localhost', port=6371, db=0)
+# r = redis.StrictRedis(host='localhost', port=6377, db=0)
 
 
 r = redis.StrictRedis(host='redis', port=6379, db=0)

@@ -102,6 +102,10 @@ class CustomerUserInfoSerializer(serializers.ModelSerializer):
         return None
 
 
+class CancelProOrderSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True)
+
+
 class OrderActiveProSerializer(serializers.ModelSerializer):
     customer_info = serializers.SerializerMethodField()
     customer_location = serializers.SerializerMethodField()

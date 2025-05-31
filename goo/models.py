@@ -1,3 +1,5 @@
+import random
+
 from django.conf import settings
 from django.db import models
 from pro.models import DeliverProfile
@@ -26,11 +28,13 @@ class Order(models.Model):
         ('arrived_at_store', 'Do‘konga yetib keldi'),
         ('picked_up', 'Yukni oldi'),
         ('en_route_to_customer', 'Mijozga yo‘lda'),
-        ('delivered', 'Yetkazib berildi'),
+        ('arrived_to_customer', 'manziliga yetib keldi'),
+        ('handed_over', 'Mahsulot topshirildi'),
     ]
 
     STATUS_CHOICES = [
         ("pending", "Pending"),
+        ("searching", "Courier searching"),
         ("assigned", "Assigned"),
         ("completed", "Completed"),
         ("canceled", "Canceled"),
@@ -41,6 +45,7 @@ class Order(models.Model):
         ("pro", "Courier"),  # Professional = Pro
         ("system", "System"),
     ]
+    order_code = models.CharField(max_length=30, unique=True, blank=True, null=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="orders")
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="orders")
     deliver = models.ForeignKey(DeliverProfile, on_delete=models.SET_NULL, related_name="orders", null=True,
@@ -77,15 +82,21 @@ class Order(models.Model):
 
     picked_up_at = models.DateTimeField(null=True, blank=True)
 
-    def cancel(self, canceled_by, user, reason=None):
-        if self.status == "canceled":
-            raise ValueError("Order is already canceled.")
-        self.status = "canceled"
-        self.canceled_by = canceled_by  # goo yoki pro
-        self.canceled_by_user = user  # actual user instance
-        self.cancel_reason = reason
-        self.canceled_at = timezone.now()
-        self.save()
+    def generate_order_code(self):
+        timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+        random_digits = random.randint(100, 999)
+        return f"AR-{timestamp}-{random_digits}"
+
+    def save(self, *args, **kwargs):
+        if not self.order_code:
+            for _ in range(5):  # 5 marta urinish
+                code = self.generate_order_code()
+                if not Order.objects.filter(order_code=code).exists():
+                    self.order_code = code
+                    break
+            else:
+                raise ValueError("Takrorlanmas order_code yaratib bo‘lmadi.")
+        super().save(*args, **kwargs)
 
     def get_items_list(self):
         """Mahsulotlarni ro‘yxatga ajratib qaytaradi"""
