@@ -15,7 +15,8 @@ from asgiref.sync import async_to_sync
 from goo.models import Contact, Order
 from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
     LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer, \
-    OrderActiveGooSerializer, CancelGooOrderSerializer, PendingSearchingOrderSerializer, RetryUpdateOrderSerializer
+    OrderActiveGooSerializer, CancelGooOrderSerializer, PendingSearchingOrderSerializer, RetryUpdateOrderSerializer, \
+    OrderDetailSerializer
 from user.models import Location
 
 from goo.tasks import send_order_to_couriers
@@ -311,3 +312,28 @@ class PendingOrdersView(APIView):
 
         serializer = PendingSearchingOrderSerializer(orders, many=True)
         return Response(serializer.data)
+
+
+class OrderDetailView(RetrieveAPIView):
+    serializer_class = OrderDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            Order.objects
+            .select_related('user', 'shop')
+            .only(
+                'id',
+                'items',
+                'allow_other_shops',
+                'house_number',
+                'apartment_number',
+                'floor',
+                'intercom_code',
+                'additional_note',
+                'shop__id', 'shop__title', 'shop__image',
+                'user__id', 'user__phone_number'
+            )
+            .filter(user=self.request.user,
+                    status__in=["pending", "searching", "assigned"])
+        )

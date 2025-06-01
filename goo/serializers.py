@@ -281,3 +281,49 @@ class PendingSearchingOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ['id', 'order_code', 'shop_title', 'shop_id', 'items', 'created_at', 'status']
+
+
+# Order Detail
+class ShopSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shop
+        fields = ['title', 'image']  # image maydoni shu yerda
+
+
+class OrderLocationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Location
+        fields = ['address', 'coordinates']
+
+
+class OrderUserSerializer(serializers.ModelSerializer):
+    active_location = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['phone_number', 'active_location']
+
+    def get_active_location(self, obj):
+        location = obj.locations.filter(active=True).first()
+        if location:
+            return OrderLocationSerializer(location).data
+        return None
+
+
+class OrderDetailSerializer(serializers.ModelSerializer):
+    shop = ShopSerializer(read_only=True)
+    user = OrderUserSerializer(read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            "items",
+            "allow_other_shops",
+            "house_number",
+            "apartment_number",
+            "floor",
+            "intercom_code",
+            "additional_note",
+            "shop",
+            "user"
+        ]
