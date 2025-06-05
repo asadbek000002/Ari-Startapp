@@ -1,10 +1,12 @@
 import random
 from django.core.cache import cache
+from django.utils import timezone
 from rest_framework import serializers
 from django.contrib.gis.measure import D
 from geopy.geocoders import Nominatim
 
-from goo.models import Order, Contact
+from goo.models import Order, Contact, Feedback
+from goo.utils import update_user_rating
 from pro.models import DeliverProfile
 from shop.models import Shop
 from user.models import UserRole, VerificationCode, Location
@@ -327,3 +329,47 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             "shop",
             "user"
         ]
+
+
+class CompleteOrderSerializer(serializers.Serializer):
+    rating = serializers.IntegerField(required=False, min_value=1, max_value=5)
+    comment = serializers.CharField(required=False, allow_blank=True, max_length=500)
+
+    def validate(self, data):
+        order = self.context.get('order')
+        user = self.context.get('request').user
+
+        if order.status in ['completed', 'canceled']:
+            raise serializers.ValidationError("Buyurtma allaqachon yakunlangan yoki bekor qilingan.")
+
+        if order.direction != 'arrived_to_customer':
+            raise serializers.ValidationError("Buyurtma hali manzilga yetib kelmagan.")
+
+        return data
+
+    def save(self, **kwargs):
+        order = self.context.get('order')
+        user = self.context.get('request').user
+        rating = self.validated_data.get('rating')
+        comment = self.validated_data.get('comment', '')
+
+        # Orderni yakunlash
+        order.status = 'completed'
+        order.delivered_at = timezone.now()
+        order.save(update_fields=['status', 'delivered_at'])
+
+        # Agar baho bo‘lsa — saqlaymiz
+        if rating and order.deliver and order.deliver.user:
+            feedback, created = Feedback.objects.get_or_create(
+                from_user=user,
+                to_user=order.deliver.user,
+                order=order,
+                defaults={
+                    'rating': rating,
+                    'comment': comment
+                }
+            )
+            if created:
+                update_user_rating(order.deliver.user)
+
+        return order

@@ -1,7 +1,7 @@
 from django.urls import path
 
 from pro.views import ProRegistrationView, DeliverHomeView, DeliverProfileView, ToggleDeliverActiveView, \
-    DeliverOrderView, CourierOrderDirectionUpdateView, cancel_order_by_courier
+    DeliverOrderView, CourierOrderDirectionUpdateView, cancel_order_by_courier, complete_order_by_courier
 
 urlpatterns = [
     path('register/', ProRegistrationView.as_view(), name='pro-register'),
@@ -14,5 +14,6 @@ urlpatterns = [
 
     path('active/orders/', DeliverOrderView.as_view(), name='courier-orders'),
     path('order/<int:order_id>/direction/', CourierOrderDirectionUpdateView.as_view()),
+    path('order/<int:order_id>/feedback/', complete_order_by_courier, name='cancel_order_pro'),
 
 ]

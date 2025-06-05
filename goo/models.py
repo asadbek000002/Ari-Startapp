@@ -106,6 +106,22 @@ class Order(models.Model):
         return f"Order {self.id} - {self.shop.title} - {self.user.phone_number}"
 
 
+class Feedback(models.Model):
+    from_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='given_feedbacks'
+    )
+    to_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='received_feedbacks'
+    )
+    order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='feedbacks')
+    rating = models.PositiveSmallIntegerField()  # 1 dan 5 gacha, validatsiya serializerda
+    comment = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['from_user', 'to_user', 'order']  # Bir odam bir order uchun bir marta feedback bersin
+
+
 class Contact(models.Model):
     phone_number = models.CharField(max_length=20, null=True, blank=True)
     telegram_link = models.URLField(null=True, blank=True)

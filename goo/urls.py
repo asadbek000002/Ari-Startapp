@@ -3,7 +3,7 @@ from django.urls import path
 from goo.views import GooRegistrationView, list_locations, LocationCreateView, create_order, update_location, \
     detail_location, active_location, UserProfileView, UpdateUserView, LatestContactView, address_order, \
     retry_order_delivery, cancel_order_by_customer, CustomerOrderView, delete_location, PendingOrdersView, \
-    update_and_retry_order, OrderDetailView
+    update_and_retry_order, OrderDetailView, complete_order_by_customer
 
 urlpatterns = [
     path('register/', GooRegistrationView.as_view(), name='goo-register'),
@@ -30,6 +30,7 @@ urlpatterns = [
     path("orders/<int:order_id>/retry/", retry_order_delivery, name="update_order"),
 
     path('order/<int:order_id>/cancel/', cancel_order_by_customer, name='cancel_order_goo'),
+    path('order/<int:order_id>/feedback/', complete_order_by_customer, name='cancel_order_goo'),
 
     path('orders/active/', CustomerOrderView.as_view(), name='courier-orders'),
 

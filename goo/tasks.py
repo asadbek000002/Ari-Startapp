@@ -102,7 +102,10 @@ def send_order_to_couriers(order_id, shop_id):
 
     # 4. Agar hech qanday kuryer topilmasa
     if not deliver_profiles:
-        notify_customer_no_courier_found(channel_layer, order)
+        order.status = "pending"  # yoki "no_courier_found"
+        order.save(update_fields=["status"])
+        send_order_status_to_customer(channel_layer, order, failed=True)
+        # notify_customer_no_courier_found(channel_layer, order)
         return f"No available couriers found for Order {order.id}"
 
     # 5. Buyurtmani yuboramiz — 10 ta kuryerga ketma-ket

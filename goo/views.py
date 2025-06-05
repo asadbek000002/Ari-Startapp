@@ -16,7 +16,7 @@ from goo.models import Contact, Order
 from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
     LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer, \
     OrderActiveGooSerializer, CancelGooOrderSerializer, PendingSearchingOrderSerializer, RetryUpdateOrderSerializer, \
-    OrderDetailSerializer
+    OrderDetailSerializer, CompleteOrderSerializer
 from user.models import Location
 
 from goo.tasks import send_order_to_couriers
@@ -238,25 +238,25 @@ def cancel_order_by_customer(request, order_id):
     order.canceled_by_user = request.user
     order.canceled_at = timezone.now()
     order.save()
+    if order.deliver is not None:
+        order.deliver.is_busy = False
+        order.deliver.save(update_fields=['is_busy'])
 
-    order.deliver.is_busy = False
-    order.deliver.save(update_fields=['is_busy'])
-
-    channel_layer = get_channel_layer()
-    group_name = f"user_{order.deliver.user_id}_pro"
-    if group_name:
-        async_to_sync(channel_layer.group_send)(
-            group_name,
-            {
-                "type": "send_notification",
-                "message": {
-                    "type": "order_canceled",
-                    "order_id": order.id,
-                    "canceled_by": order.canceled_by,
-                    "reason": reason,
+        channel_layer = get_channel_layer()
+        group_name = f"user_{order.deliver.user_id}_pro"
+        if group_name:
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {
+                    "type": "send_notification",
+                    "message": {
+                        "type": "order_canceled",
+                        "order_id": order.id,
+                        "canceled_by": order.canceled_by,
+                        "reason": reason,
+                    }
                 }
-            }
-        )
+            )
 
     return Response({
         'status': 'success',
@@ -337,3 +337,18 @@ class OrderDetailView(RetrieveAPIView):
             .filter(user=self.request.user,
                     status__in=["pending", "searching", "assigned"])
         )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def complete_order_by_customer(request, order_id):
+    try:
+        order = Order.objects.get(id=order_id, user=request.user)
+    except Order.DoesNotExist:
+        return Response({'detail': 'Buyurtma topilmadi yoki sizga tegishli emas.'}, status=404)
+
+    serializer = CompleteOrderSerializer(data=request.data, context={'request': request, 'order': order})
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'status': 'completed'}, status=200)
+    return Response(serializer.errors, status=400)

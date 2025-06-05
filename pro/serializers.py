@@ -1,8 +1,10 @@
 import random
 from django.core.cache import cache
+from django.utils import timezone
 from rest_framework import serializers
 
-from goo.models import Order
+from goo.models import Order, Feedback
+from goo.utils import update_user_rating
 from user.models import UserRole, VerificationCode
 from django.contrib.auth import get_user_model
 from pro.models import DeliverProfile
@@ -160,30 +162,50 @@ class OrderActiveProSerializer(serializers.ModelSerializer):
                 }
         return None
 
-# class OrderActiveProSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Order
-#         fields = [
-#             'id',  # Zakaz ID
-#             'user',  # Foydalanuvchi (user)
-#             'shop',  # Do'kon (shop)
-#             'deliver',  # Yetkazib beruvchi (deliver)
-#             'items',  # Mahsulotlar ro'yxati (items)
-#             'allow_other_shops',  # Boshqa do'konlardan olib kelish (allow_other_shops)
-#             'house_number',  # Uy raqami (house_number)
-#             'apartment_number',  # Kvartira raqami (apartment_number)
-#             'floor',  # Qavat (floor)
-#             'has_intercom',  # Interkom mavjudligi (has_intercom)
-#             'intercom_code',  # Interkom kodi (intercom_code)
-#             'additional_note',  # Qo'shimcha izoh (additional_note)
-#             'status',  # Zakaz holati (status)
-#             'canceled_by_user',  # Zakazni bekor qilgan foydalanuvchi (canceled_by_user)
-#             'canceled_by',  # Zakazni bekor qilgan shaxs (canceled_by)
-#             'cancel_reason',  # Bekor qilish sababi (cancel_reason)
-#             'canceled_at',  # Bekor qilingan vaqt (canceled_at)
-#             'created_at',  # Zakaz yaratish vaqti (created_at)
-#             'delivery_distance_km',  # Yetkazib berish masofasi (delivery_distance_km)
-#             'delivery_duration_min',  # Yetkazib berish davomiyligi (delivery_duration_min)
-#             'assigned_at',  # Tayinlangan vaqt (assigned_at)
-#             'delivered_at',  # Yetkazib berilgan vaqt (delivered_at)
-#         ]
+
+class CourierCompleteOrderSerializer(serializers.Serializer):
+    rating = serializers.IntegerField(required=False, min_value=1, max_value=5)
+    comment = serializers.CharField(required=False, allow_blank=True, max_length=500)
+
+    def validate(self, data):
+        order = self.context.get('order')
+        user = self.context.get('request').user
+
+        # Faqat o‘ziga tegishli buyurtmani yakunlashi kerak
+        if order.deliver is None or order.deliver.user != user:
+            raise serializers.ValidationError("Bu buyurtmaga kuryer sifatida siz tegishli emassiz.")
+
+        if order.status != 'completed':
+            raise serializers.ValidationError("Buyurtma hali mijoz tomonidan yakunlanmagan.")
+
+        if order.direction != 'arrived_to_customer':
+            raise serializers.ValidationError("Buyurtma hali manzilga yetib kelmagan.")
+
+        return data
+
+    def save(self, **kwargs):
+        order = self.context.get('order')
+        user = self.context.get('request').user
+        rating = self.validated_data.get('rating')
+        comment = self.validated_data.get('comment', '')
+
+        # Orderni yakunlashni final bosqichi - mahsulot topshirildi
+        order.direction = 'handed_over'
+        # order.hand_over_at = timezone.now()  # Agar bunday maydon bo'lsa, agar yo'q bo'lsa qo'shish kerak
+        order.save(update_fields=['direction'])
+
+        # Agar baho bo‘lsa — saqlaymiz
+        if rating:
+            feedback, created = Feedback.objects.get_or_create(
+                from_user=user,
+                to_user=order.user,
+                order=order,
+                defaults={
+                    'rating': rating,
+                    'comment': comment
+                }
+            )
+            if created:
+                update_user_rating(order.user)
+
+        return order

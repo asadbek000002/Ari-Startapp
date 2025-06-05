@@ -10,7 +10,7 @@ from channels.layers import get_channel_layer
 
 from django.contrib.auth import get_user_model
 from pro.serializers import ProRegistrationSerializer, DeliverHomeSerializer, DeliverProfileSerializer, \
-    OrderActiveProSerializer, CancelProOrderSerializer
+    OrderActiveProSerializer, CancelProOrderSerializer, CourierCompleteOrderSerializer
 from .models import DeliverProfile
 from goo.models import Order
 from django.utils import timezone
@@ -172,7 +172,8 @@ class CourierOrderDirectionUpdateView(APIView):
 
     def post(self, request, order_id):
         new_direction = request.data.get("direction")
-        valid_directions = ['arrived_at_store', 'picked_up', 'en_route_to_customer', 'delivered']
+        valid_directions = ['arrived_at_store', 'picked_up', 'en_route_to_customer', 'arrived_to_customer',
+                            'handed_over']
 
         if new_direction not in valid_directions:
             return Response({"detail": "Invalid direction"}, status=400)
@@ -189,9 +190,9 @@ class CourierOrderDirectionUpdateView(APIView):
         # Yo'nalish bo'yicha vaqtlar
         if new_direction == 'picked_up':
             order.picked_up_at = timezone.now()
-        elif new_direction == 'delivered':
-            order.delivered_at = timezone.now()
-            order.status = 'completed'  # Yakunlangan holat
+        elif new_direction == 'arrived_to_customer':
+            order.deliver.is_busy = False
+            order.deliver.save(update_fields=['is_busy'])
 
         order.direction = new_direction
         order.save()
@@ -210,3 +211,18 @@ class CourierOrderDirectionUpdateView(APIView):
             }
         )
         return Response({"detail": "Direction updated", "direction": order.direction})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def complete_order_by_courier(request, order_id):
+    try:
+        order = Order.objects.select_related('deliver', 'user').get(id=order_id)
+    except Order.DoesNotExist:
+        return Response({'detail': 'Buyurtma topilmadi.'}, status=404)
+
+    serializer = CourierCompleteOrderSerializer(data=request.data, context={'request': request, 'order': order})
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'status': 'handed_over'}, status=200)
+    return Response(serializer.errors, status=400)
