@@ -32,7 +32,7 @@ urlpatterns = [
     path('order/<int:order_id>/cancel/', cancel_order_by_customer, name='cancel_order_goo'),
     path('order/<int:order_id>/feedback/', complete_order_by_customer, name='cancel_order_goo'),
 
-    path('orders/active/', CustomerOrderView.as_view(), name='courier-orders'),
+    path('orders/active/<int:id>/', CustomerOrderView.as_view(), name='courier-orders'),
 
     path('orders/pending-searching/', PendingOrdersView.as_view(), name='pending-orders'),
 

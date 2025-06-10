@@ -87,12 +87,12 @@ class ToggleDeliverActiveView(APIView):
 class DeliverOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request, id):
         order = (
             Order.objects
             .select_related('deliver__user', 'shop')
             .prefetch_related('deliver__deliver_locations', 'user__locations')
-            .filter(deliver__user=request.user, status="assigned", assigned_at__isnull=False)
+            .filter(deliver__user=request.user, id=id, status="assigned", assigned_at__isnull=False)
             .order_by('-assigned_at')
             .only(
                 "id", 'delivery_price',
@@ -173,7 +173,7 @@ class CourierOrderDirectionUpdateView(APIView):
     def post(self, request, order_id):
         new_direction = request.data.get("direction")
         valid_directions = ['arrived_at_store', 'picked_up', 'en_route_to_customer', 'arrived_to_customer',
-                            'handed_over']
+                            ]
 
         if new_direction not in valid_directions:
             return Response({"detail": "Invalid direction"}, status=400)
@@ -200,7 +200,6 @@ class CourierOrderDirectionUpdateView(APIView):
         # WebSocket orqali order egasiga (goo userga) habar yuborish
         channel_layer = get_channel_layer()
         group_name = f"user_{order.user_id}_goo"
-        print(group_name)
 
         async_to_sync(channel_layer.group_send)(
             group_name,

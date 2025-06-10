@@ -267,12 +267,12 @@ def cancel_order_by_customer(request, order_id):
 class CustomerOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request, id):
         order = (
             Order.objects
             .select_related('deliver__user', 'shop')
             .prefetch_related('deliver__deliver_locations', 'user__locations')
-            .filter(user=request.user, status="assigned", assigned_at__isnull=False)
+            .filter(user=request.user, id=id, status="assigned", assigned_at__isnull=False)
             .order_by('-assigned_at')
             .only(
                 'id', 'delivery_price',
@@ -350,5 +350,18 @@ def complete_order_by_customer(request, order_id):
     serializer = CompleteOrderSerializer(data=request.data, context={'request': request, 'order': order})
     if serializer.is_valid():
         serializer.save()
+        channel_layer = get_channel_layer()
+        group_name = f"user_{order.deliver.user_id}_pro"
+
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                "type": "send_notification",  # bu method nomi
+                "message": {
+                    "event": "order_completed",
+                    "order_id": order.id,
+                }
+            }
+        )
         return Response({'status': 'completed'}, status=200)
     return Response(serializer.errors, status=400)

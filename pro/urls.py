@@ -12,7 +12,7 @@ urlpatterns = [
 
     path('order/<int:order_id>/cancel/', cancel_order_by_courier, name='cancel_order_pro'),
 
-    path('active/orders/', DeliverOrderView.as_view(), name='courier-orders'),
+    path('active/orders/<int:id>/', DeliverOrderView.as_view(), name='courier-orders'),
     path('order/<int:order_id>/direction/', CourierOrderDirectionUpdateView.as_view()),
     path('order/<int:order_id>/feedback/', complete_order_by_courier, name='cancel_order_pro'),
 
