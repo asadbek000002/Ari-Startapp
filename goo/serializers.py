@@ -276,7 +276,7 @@ class OrderActiveGooSerializer(serializers.ModelSerializer):
         return None
 
 
-class PendingSearchingOrderSerializer(serializers.ModelSerializer):
+class PendingSearchingAssignedOrderSerializer(serializers.ModelSerializer):
     shop_title = serializers.CharField(source='shop.title')
     shop_id = serializers.CharField(source='shop.id')
 

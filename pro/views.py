@@ -10,7 +10,7 @@ from channels.layers import get_channel_layer
 
 from django.contrib.auth import get_user_model
 from pro.serializers import ProRegistrationSerializer, DeliverHomeSerializer, DeliverProfileSerializer, \
-    OrderActiveProSerializer, CancelProOrderSerializer, CourierCompleteOrderSerializer
+    OrderActiveProSerializer, CancelProOrderSerializer, CourierCompleteOrderSerializer, AssignedOrderProSerializer
 from .models import DeliverProfile
 from goo.models import Order
 from django.utils import timezone
@@ -225,3 +225,19 @@ def complete_order_by_courier(request, order_id):
         serializer.save()
         return Response({'status': 'handed_over'}, status=200)
     return Response(serializer.errors, status=400)
+
+
+class AssignedOrdersProView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        orders = (
+            Order.objects
+            .filter(deliver__user=request.user, status="assigned")
+            .select_related("shop")
+            .only("id", "shop__title", "shop__id", "items", "created_at")
+            .order_by("-created_at")
+        )
+
+        serializer = AssignedOrderProSerializer(orders, many=True)
+        return Response(serializer.data)
