@@ -114,6 +114,36 @@ class DeliverOrderView(APIView):
         serializer = OrderActiveProSerializer(order, context={'request': request})
         return Response(serializer.data)
 
+class DeliverActiveOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        order = (
+            Order.objects
+            .select_related('deliver__user', 'shop')
+            .prefetch_related('deliver__deliver_locations', 'user__locations')
+            .filter(deliver__user=request.user, status="assigned", assigned_at__isnull=False)
+            .order_by('-assigned_at')
+            .only(
+                "id", 'delivery_price',
+                "assigned_at",
+                'direction',
+                'delivery_duration_min',
+                "user__id",
+                "user__avatar",
+                "user__full_name",
+                "user__phone_number",
+                "user__rating",  # Zakaz bergan user maydonlari
+                "deliver__user__id",
+                'shop__coordinates',  # Faqat filter uchun kerak
+            ).first()
+        )
+        if not order:
+            return Response({"detail": "No active order found."}, status=404)
+
+        serializer = OrderActiveProSerializer(order, context={'request': request})
+        return Response(serializer.data)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
