@@ -413,41 +413,49 @@ def send_order_status_to_customer(channel_layer, order, failed=False):
             }
         )
 
-
-def calculate_order_route_info(deliver_coords, shop_coords, customer_coords, deliver_role):
+def calculate_order_route_info(deliver_coords, shop_coords, customer_coords, deliver_role, direction=None):
     """
-    3 nuqta asosida (deliver → shop → customer) ORS orqali marshrutni hisoblaydi.
+    Kuryer → Do‘kon → Mijoz yoki Kuryer → Mijoz marshrutini hisoblaydi.
+
     :param deliver_coords: (lon, lat) tuple
     :param shop_coords: (lon, lat) tuple
     :param customer_coords: (lon, lat) tuple
+    :param deliver_role: 'bike' yoki 'foot'
+    :param direction: order.direction (ixtiyoriy, None bo‘lsa do‘kon ham hisoblanadi)
     :return: (distance_km, duration_min) yoki (None, None)
     """
     try:
-        # OpenRouteService client'ni yaratamiz
         client = Client(key=settings.ORS_API_KEY)
 
-        # Coordinates ro'yxatini tayyorlaymiz
-        coords = [deliver_coords, shop_coords, customer_coords]
+        # Do‘konni tashlab ketiladigan bosqichlar (ya'ni uni hisobga olmaymiz):
+        skip_shop_directions = {
+            "arrived_at_store",
+            "picked_up",
+            "en_route_to_customer",
+            "arrived_to_customer",
+            "handed_over"
+        }
 
-        # Transport turiga qarab profile ni belgilaymiz
-        if deliver_role == 'bike':
-            profile = 'cycling-regular'  # Velosiped
+        # direction yo‘q bo‘lsa yoki hali do‘konga bormagan bo‘lsa – 3ta nuqta
+        if direction in skip_shop_directions:
+            coords = [deliver_coords, customer_coords]
         else:
-            profile = 'foot-walking'  # Piyoda
+            coords = [deliver_coords, shop_coords, customer_coords]
 
-        # Marshrutni hisoblash uchun API'ga so'rov yuboramiz
+        # transport vositasiga qarab profil tanlash
+        profile = 'cycling-regular' if deliver_role == 'bike' else 'foot-walking'
+
+        # ORS dan route so‘rash
         route = client.directions(
             coordinates=coords,
-            profile=profile,  # Kuryer vositasi
+            profile=profile,
             format='json'
         )
 
-        # Javobdan summaryni olish
         summary = route['routes'][0]['summary']
-        distance_km = round(summary['distance'] / 1000, 2)  # masofa km da
-        duration_min = round(summary['duration'] / 60, 1)  # vaqt daqiqa bilan
+        distance_km = round(summary['distance'] / 1000, 2)
+        duration_min = round(summary['duration'] / 60, 1)
 
-        # Natijalarni qaytarish
         return distance_km, duration_min
 
     except ApiError as e:
@@ -455,5 +463,4 @@ def calculate_order_route_info(deliver_coords, shop_coords, customer_coords, del
     except Exception as e:
         print(f"ORS umumiy xato: {e}")
 
-    # Agar xato bo'lsa, None qaytarish
     return None, None

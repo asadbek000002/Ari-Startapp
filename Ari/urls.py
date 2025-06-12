@@ -8,9 +8,9 @@ from drf_yasg import openapi
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="E-Investment API",
+        title="Ari Goo and Pro API",
         default_version='v1',
-        description="E-Investment project API",
+        description="Ari project API",
         terms_of_service="https://www.google.com/policies/terms/",
         contact=openapi.Contact(email="contact@snippets.local"),
         license=openapi.License(name="BSD License"),
