@@ -1,22 +1,16 @@
-from channels.generic.websocket import AsyncWebsocketConsumer
-from asgiref.sync import sync_to_async
-import json
 import redis
-from goo.models import Order, DeliverProfile
-from django.utils.timezone import localtime
-from django.utils.timezone import now
 import math
 import time
 import json
-from goo.models import Order, DeliverProfile
 from django.utils.timezone import localtime, now
+from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 from goo.tasks import calculate_order_route_info
 from user.models import Location
+from goo.models import Order
+from pro.models import DeliverProfile
 
 # r = redis.StrictRedis(host='localhost', port=6377, db=0)
-
-
 r = redis.StrictRedis(host='redis', port=6379, db=0)
 
 
@@ -97,11 +91,11 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
 
         # 1. Orderni topamiz
         try:
-            order = await sync_to_async(Order.objects.select_related("shop", "user").get)(
-                deliver=profile,
-                status="assigned",
-                assigned_at__isnull=False
-            )
+            order = await sync_to_async(
+                lambda: Order.objects.select_related("shop", "user")
+                .filter(deliver=profile, status="assigned", assigned_at__isnull=False)
+                .first()
+            )()
 
             active_location = await sync_to_async(Location.objects.filter(user=order.user, active=True).first)()
 
