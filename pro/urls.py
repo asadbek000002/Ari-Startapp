@@ -1,11 +1,13 @@
 from django.urls import path
-
-from pro.views import ProRegistrationView, DeliverHomeView, DeliverProfileView, ToggleDeliverActiveView, \
+# ProRegistrationView
+from pro.views import DeliverHomeView, DeliverProfileView, ToggleDeliverActiveView, \
     DeliverOrderView, CourierOrderDirectionUpdateView, cancel_order_by_courier, complete_order_by_courier, \
-    AssignedOrdersProView, DeliverActiveOrderView
+    AssignedOrdersProView, DeliverActiveOrderView, SendProVerificationCodeView, VerifyProCodeLoginView
 
 urlpatterns = [
-    path('register/', ProRegistrationView.as_view(), name='pro_register'),
+    # path('register/', ProRegistrationView.as_view(), name='pro_register'),
+    path('send-code/', SendProVerificationCodeView.as_view(), name='pro_send_code'),
+    path('verify-code/', VerifyProCodeLoginView.as_view(), name='pro_verify_code'),
 
     path('deliver-home/', DeliverHomeView.as_view(), name='deliver_home'),
     path('deliver-profile/', DeliverProfileView.as_view(), name='deliver_profile'),

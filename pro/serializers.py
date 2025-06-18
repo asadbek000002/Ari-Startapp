@@ -8,61 +8,117 @@ from goo.utils import update_user_rating
 from user.models import UserRole, VerificationCode
 from django.contrib.auth import get_user_model
 from pro.models import DeliverProfile
+from user.sms_utils import send_sms
 
 User = get_user_model()
 
 
-class ProRegistrationSerializer(serializers.Serializer):
+# 1️⃣ Kod yuborish
+class SendProCodeSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=20)
-    code = serializers.CharField(max_length=6, required=False)  # Ikkinchi input
 
     def validate(self, data):
-        phone_number = data.get("phone_number")
-        code = data.get("code")
-        cache_key = f"registration_wait_{phone_number}"
+        phone_number = data["phone_number"]
 
-        # 1️⃣ Agar faqat telefon raqami bo'lsa – Kodni yuborish
-        if not code:
-            # 6 xonali tasdiqlash kodini yaratamiz
-            verification_code = str(random.randint(10000, 99999))
+        # Pro user mavjudmi?
+        try:
+            user = User.objects.get(phone_number=phone_number, roles__name="pro")
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Bu raqam bilan ro‘yxatdan o‘tgan 'pro' foydalanuvchi topilmadi.")
 
-            # Cache va bazaga saqlaymiz
-            cache.set(cache_key, verification_code, timeout=60)
-            VerificationCode.objects.update_or_create(
-                phone_number=phone_number, defaults={"code": verification_code}
-            )
+        verification_code = str(random.randint(1000, 9999))
+        cache_key = f"login_pro_{phone_number}"
 
-            # SMS yuborish (hozircha print)
-            # print(f"📲 SMS kod: {verification_code}")
+        cache.set(cache_key, verification_code, timeout=120)
+        VerificationCode.objects.update_or_create(
+            phone_number=phone_number,
+            defaults={"code": verification_code}
+        )
 
-            raise serializers.ValidationError(
-                f"Iltimos, 1 daqiqa ichida kodni kiriting!  📲 SMS kod: {verification_code} ")
-
-        # 2️⃣ Agar kod yuborilgan bo‘lsa – Uni tekshirish
-        cached_code = cache.get(cache_key)
-        if not cached_code:
-            raise serializers.ValidationError("Kod muddati tugagan yoki noto‘g‘ri raqam!")
-
-        if code != cached_code:
-            raise serializers.ValidationError("Kod noto‘g‘ri!")
+        sms_text = (
+            f"Ari mobil ilovasiga kirish uchun tasdiqlash kodi: {verification_code}. "
+            f"Kodni hech kimga bermang."
+        )
+        send_sms(phone_number, sms_text)
 
         return data
 
-    def create(self, validated_data):
-        phone_number = validated_data["phone_number"]
 
-        # Ro‘lni topish yoki yaratish
-        pro_role, _ = UserRole.objects.get_or_create(name="pro")
+# goo/serializers.py (davomi)
+class VerifyProCodeSerializer(serializers.Serializer):
+    phone_number = serializers.CharField()
+    code = serializers.CharField()
 
-        # Foydalanuvchini yaratish yoki topish
-        worker, _ = User.objects.get_or_create(phone_number=phone_number)
-        worker.roles.add(pro_role)
+    def validate(self, data):
+        phone = data['phone_number']
+        code = data['code']
+        cache_key = f"login_pro_{phone}"
 
-        # Cache va bazadan kodni o‘chiramiz
-        cache.delete(f"registration_wait_{phone_number}")
-        VerificationCode.objects.filter(phone_number=phone_number).delete()
+        cached_code = cache.get(cache_key)
+        if not cached_code or code != cached_code:
+            raise serializers.ValidationError("Kod noto‘g‘ri yoki muddati tugagan.")
 
-        return worker
+        # Faqat mavjud 'pro' foydalanuvchini olish
+        try:
+            user = User.objects.get(phone_number=phone, roles__name='pro')
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Bu telefon raqam 'pro' foydalanuvchisi emas.")
+
+        data['user'] = user  # viewda token berish uchun kerak
+        return data
+
+
+# class ProRegistrationSerializer(serializers.Serializer):
+#     phone_number = serializers.CharField(max_length=20)
+#     code = serializers.CharField(max_length=6, required=False)  # Ikkinchi input
+#
+#     def validate(self, data):
+#         phone_number = data.get("phone_number")
+#         code = data.get("code")
+#         cache_key = f"registration_wait_{phone_number}"
+#
+#         # 1️⃣ Agar faqat telefon raqami bo'lsa – Kodni yuborish
+#         if not code:
+#             # 6 xonali tasdiqlash kodini yaratamiz
+#             verification_code = str(random.randint(10000, 99999))
+#
+#             # Cache va bazaga saqlaymiz
+#             cache.set(cache_key, verification_code, timeout=60)
+#             VerificationCode.objects.update_or_create(
+#                 phone_number=phone_number, defaults={"code": verification_code}
+#             )
+#
+#             # SMS yuborish (hozircha print)
+#             # print(f"📲 SMS kod: {verification_code}")
+#
+#             raise serializers.ValidationError(
+#                 f"Iltimos, 1 daqiqa ichida kodni kiriting!  📲 SMS kod: {verification_code} ")
+#
+#         # 2️⃣ Agar kod yuborilgan bo‘lsa – Uni tekshirish
+#         cached_code = cache.get(cache_key)
+#         if not cached_code:
+#             raise serializers.ValidationError("Kod muddati tugagan yoki noto‘g‘ri raqam!")
+#
+#         if code != cached_code:
+#             raise serializers.ValidationError("Kod noto‘g‘ri!")
+#
+#         return data
+#
+#     def create(self, validated_data):
+#         phone_number = validated_data["phone_number"]
+#
+#         # Ro‘lni topish yoki yaratish
+#         pro_role, _ = UserRole.objects.get_or_create(name="pro")
+#
+#         # Foydalanuvchini yaratish yoki topish
+#         worker, _ = User.objects.get_or_create(phone_number=phone_number)
+#         worker.roles.add(pro_role)
+#
+#         # Cache va bazadan kodni o‘chiramiz
+#         cache.delete(f"registration_wait_{phone_number}")
+#         VerificationCode.objects.filter(phone_number=phone_number).delete()
+#
+#         return worker
 
 
 class DeliverHomeSerializer(serializers.ModelSerializer):

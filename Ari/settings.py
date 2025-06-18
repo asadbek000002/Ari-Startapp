@@ -11,7 +11,10 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 from datetime import timedelta
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -118,7 +121,7 @@ CELERY_RESULT_BACKEND = "redis://redis:6379/0"
 #         'PORT': 5432,
 #     }
 # }
-# 
+#
 # # Redis-ni broker sifatida belgilash
 # CELERY_BROKER_URL = 'redis://localhost:6377/0'  # Local
 # # Backend natijalarini saqlash uchun Redis
@@ -247,6 +250,8 @@ CELERY_IMPORTS = (
     "shop.tasks",  # Barcha Celery vazifalari joylashgan papkalarni qo‘shing
 )
 
-
 # settings.py
 ORS_API_KEY = '5b3ce3597851110001cf624810e066d8e48ae82870dc16435e343119622b5141fc32181c7585e930'
+
+ESKIZ_EMAIL = os.environ.get("ESKIZ_EMAIL")
+ESKIZ_PASSWORD = os.environ.get("ESKIZ_PASSWORD")

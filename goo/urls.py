@@ -1,12 +1,15 @@
 from django.urls import path
 
-from goo.views import GooRegistrationView, list_locations, LocationCreateView, create_order, update_location, \
+from goo.views import list_locations, LocationCreateView, create_order, update_location, \
     detail_location, active_location, UserProfileView, UpdateUserView, LatestContactView, address_order, \
     retry_order_delivery, cancel_order_by_customer, CustomerOrderView, delete_location, PendingSearchingOrdersView, \
-    update_and_retry_order, OrderDetailView, complete_order_by_customer, AssignedOrdersView
+    update_and_retry_order, OrderDetailView, complete_order_by_customer, AssignedOrdersView, SendVerificationCodeView, \
+    VerifyCodeAndLoginView
 
 urlpatterns = [
-    path('register/', GooRegistrationView.as_view(), name='goo-register'),
+    # path('register/', GooRegistrationView.as_view(), name='goo-register'),
+    path('send-code/', SendVerificationCodeView.as_view(), name='goo_send_code'),
+    path('verify-code/', VerifyCodeAndLoginView.as_view(), name='goo_verify_code'),
 
     path('locations/', list_locations, name='location_list'),
     path('locations-active/', active_location, name='location_active'),

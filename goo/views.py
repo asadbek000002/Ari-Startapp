@@ -13,10 +13,12 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 from goo.models import Contact, Order
-from goo.serializers import GooRegistrationSerializer, LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
+# GooRegistrationSerializer
+from goo.serializers import LocationSerializer, OrderSerializer, LocationUpdateSerializer, \
     LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer, \
-    OrderActiveGooSerializer, CancelGooOrderSerializer, PendingSearchingAssignedOrderSerializer, RetryUpdateOrderSerializer, \
-    OrderDetailSerializer, CompleteOrderSerializer
+    OrderActiveGooSerializer, CancelGooOrderSerializer, PendingSearchingAssignedOrderSerializer, \
+    RetryUpdateOrderSerializer, \
+    OrderDetailSerializer, CompleteOrderSerializer, SendVerificationCodeSerializer, VerifyCodeSerializer
 from user.models import Location
 
 from goo.tasks import send_order_to_couriers
@@ -24,22 +26,29 @@ from goo.tasks import send_order_to_couriers
 User = get_user_model()
 
 
-class GooRegistrationView(CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = GooRegistrationSerializer
+class SendVerificationCodeView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = SendVerificationCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response({"detail": "Kod yuborildi."}, status=200)
+
+
+class VerifyCodeAndLoginView(CreateAPIView):
+    serializer_class = VerifyCodeSerializer
     permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        worker = serializer.save()
+        user = serializer.save()
 
-        refresh = RefreshToken.for_user(worker)
-
+        refresh = RefreshToken.for_user(user)
         return Response({
-            # "refresh": str(refresh),
             "access": str(refresh.access_token),
-        }, status=status.HTTP_201_CREATED)
+            # "refresh": str(refresh)
+        }, status=status.HTTP_200_OK)
 
 
 class LocationCreateView(CreateAPIView):

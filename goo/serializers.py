@@ -12,40 +12,48 @@ from shop.models import Shop
 from user.models import UserRole, VerificationCode, Location
 from django.contrib.auth import get_user_model
 
+from user.sms_utils import send_sms
+
 User = get_user_model()
 
-
-class GooRegistrationSerializer(serializers.Serializer):
+class SendVerificationCodeSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=20)
-    code = serializers.CharField(max_length=6, required=False)  # Ikkinchi input
 
     def validate(self, data):
-        phone_number = data.get("phone_number")
-        code = data.get("code")
+        phone_number = data["phone_number"]
+
+        verification_code = str(random.randint(1000, 9999))
         cache_key = f"registration_wait_{phone_number}"
 
-        # 1️⃣ Agar faqat telefon raqami bo'lsa – Kodni yuborish
-        if not code:
-            # 6 xonali tasdiqlash kodini yaratamiz
-            verification_code = str(random.randint(10000, 99999))
+        # Cache + bazaga yozamiz
+        cache.set(cache_key, verification_code, timeout=120)
+        VerificationCode.objects.update_or_create(
+            phone_number=phone_number,
+            defaults={"code": verification_code}
+        )
 
-            # Cache va bazaga saqlaymiz
-            cache.set(cache_key, verification_code, timeout=60)
-            VerificationCode.objects.update_or_create(
-                phone_number=phone_number, defaults={"code": verification_code}
-            )
+        # Eskiz.uz orqali SMS yuboramiz
+        sms_text = (
+            f"Ari mobil ilovasiga kirish uchun tasdiqlash kodi: {verification_code}. "
+            f"Kodni hech kimga bermang."
+        )
+        send_sms(phone_number, sms_text)
 
-            # SMS yuborish (hozircha print)
-            # print(f"📲 SMS kod: {verification_code}")
+        return data
 
-            raise serializers.ValidationError(
-                f"Iltimos, 1 daqiqa ichida kodni kiriting!  📲 SMS kod: {verification_code} ")
 
-        # 2️⃣ Agar kod yuborilgan bo‘lsa – Uni tekshirish
+class VerifyCodeSerializer(serializers.Serializer):
+    phone_number = serializers.CharField(max_length=20)
+    code = serializers.CharField(max_length=6)
+
+    def validate(self, data):
+        phone_number = data["phone_number"]
+        code = data["code"]
+        cache_key = f"registration_wait_{phone_number}"
+
         cached_code = cache.get(cache_key)
         if not cached_code:
-            raise serializers.ValidationError("Kod muddati tugagan yoki noto‘g‘ri raqam!")
-
+            raise serializers.ValidationError("Kod muddati tugagan yoki topilmadi.")
         if code != cached_code:
             raise serializers.ValidationError("Kod noto‘g‘ri!")
 
@@ -54,19 +62,70 @@ class GooRegistrationSerializer(serializers.Serializer):
     def create(self, validated_data):
         phone_number = validated_data["phone_number"]
 
-        # Ro‘lni topish yoki yaratish
+        # Ro‘lni qo‘shamiz
         goo_role, _ = UserRole.objects.get_or_create(name="goo")
+        user, _ = User.objects.get_or_create(phone_number=phone_number)
+        user.roles.add(goo_role)
 
-        # Foydalanuvchini yaratish yoki topish
-        worker, _ = User.objects.get_or_create(phone_number=phone_number)
-
-        worker.roles.add(goo_role)
-
-        # Cache va bazadan kodni o‘chiramiz
+        # Cache va bazadan tozalash
         cache.delete(f"registration_wait_{phone_number}")
         VerificationCode.objects.filter(phone_number=phone_number).delete()
 
-        return worker
+        return user
+
+
+# class GooRegistrationSerializer(serializers.Serializer):
+#     phone_number = serializers.CharField(max_length=20)
+#     code = serializers.CharField(max_length=6, required=False)  # Ikkinchi input
+#
+#     def validate(self, data):
+#         phone_number = data.get("phone_number")
+#         code = data.get("code")
+#         cache_key = f"registration_wait_{phone_number}"
+#
+#         # 1️⃣ Agar faqat telefon raqami bo'lsa – Kodni yuborish
+#         if not code:
+#             # 6 xonali tasdiqlash kodini yaratamiz
+#             verification_code = str(random.randint(10000, 99999))
+#
+#             # Cache va bazaga saqlaymiz
+#             cache.set(cache_key, verification_code, timeout=60)
+#             VerificationCode.objects.update_or_create(
+#                 phone_number=phone_number, defaults={"code": verification_code}
+#             )
+#
+#             # SMS yuborish (hozircha print)
+#             # print(f"📲 SMS kod: {verification_code}")
+#
+#             raise serializers.ValidationError(
+#                 f"Iltimos, 1 daqiqa ichida kodni kiriting!  📲 SMS kod: {verification_code} ")
+#
+#         # 2️⃣ Agar kod yuborilgan bo‘lsa – Uni tekshirish
+#         cached_code = cache.get(cache_key)
+#         if not cached_code:
+#             raise serializers.ValidationError("Kod muddati tugagan yoki noto‘g‘ri raqam!")
+#
+#         if code != cached_code:
+#             raise serializers.ValidationError("Kod noto‘g‘ri!")
+#
+#         return data
+#
+#     def create(self, validated_data):
+#         phone_number = validated_data["phone_number"]
+#
+#         # Ro‘lni topish yoki yaratish
+#         goo_role, _ = UserRole.objects.get_or_create(name="goo")
+#
+#         # Foydalanuvchini yaratish yoki topish
+#         worker, _ = User.objects.get_or_create(phone_number=phone_number)
+#
+#         worker.roles.add(goo_role)
+#
+#         # Cache va bazadan kodni o‘chiramiz
+#         cache.delete(f"registration_wait_{phone_number}")
+#         VerificationCode.objects.filter(phone_number=phone_number).delete()
+#
+#         return worker
 
 
 # userlar o'z joylashuvini qoshadi va yaratadi

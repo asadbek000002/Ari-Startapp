@@ -9,8 +9,9 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from django.contrib.auth import get_user_model
-from pro.serializers import ProRegistrationSerializer, DeliverHomeSerializer, DeliverProfileSerializer, \
-    OrderActiveProSerializer, CancelProOrderSerializer, CourierCompleteOrderSerializer, AssignedOrderProSerializer
+from pro.serializers import DeliverHomeSerializer, DeliverProfileSerializer, \
+    OrderActiveProSerializer, CancelProOrderSerializer, CourierCompleteOrderSerializer, AssignedOrderProSerializer, \
+    SendProCodeSerializer, VerifyProCodeSerializer
 from .models import DeliverProfile
 from goo.models import Order
 from django.utils import timezone
@@ -18,22 +19,47 @@ from django.utils import timezone
 User = get_user_model()
 
 
-class ProRegistrationView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = ProRegistrationSerializer
+class SendProVerificationCodeView(APIView):
     permission_classes = [AllowAny]
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+    def post(self, request):
+        serializer = SendProCodeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        worker = serializer.save()
+        return Response({"detail": "Kod yuborildi."}, status=200)
 
-        refresh = RefreshToken.for_user(worker)
+
+class VerifyProCodeLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = VerifyProCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+
+        refresh = RefreshToken.for_user(user)
 
         return Response({
-            # "refresh": str(refresh),
             "access": str(refresh.access_token),
-        }, status=status.HTTP_201_CREATED)
+            # "refresh": str(refresh),
+        }, status=status.HTTP_200_OK)
+
+
+# class ProRegistrationView(generics.CreateAPIView):
+#     queryset = User.objects.all()
+#     serializer_class = ProRegistrationSerializer
+#     permission_classes = [AllowAny]
+#
+#     def create(self, request, *args, **kwargs):
+#         serializer = self.get_serializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         worker = serializer.save()
+#
+#         refresh = RefreshToken.for_user(worker)
+#
+#         return Response({
+#             # "refresh": str(refresh),
+#             "access": str(refresh.access_token),
+#         }, status=status.HTTP_201_CREATED)
 
 
 # DELIVERNI HOME PAGEDAGI MALUMOTLARI
@@ -113,6 +139,7 @@ class DeliverOrderView(APIView):
 
         serializer = OrderActiveProSerializer(order, context={'request': request})
         return Response(serializer.data)
+
 
 class DeliverActiveOrderView(APIView):
     permission_classes = [IsAuthenticated]
