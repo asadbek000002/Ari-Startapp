@@ -26,7 +26,7 @@ class SendProCodeSerializer(serializers.Serializer):
         except User.DoesNotExist:
             raise serializers.ValidationError("Bu raqam bilan ro‘yxatdan o‘tgan 'pro' foydalanuvchi topilmadi.")
 
-        verification_code = str(random.randint(1000, 9999))
+        verification_code = str(random.randint(100000, 999999))
         cache_key = f"login_pro_{phone_number}"
 
         cache.set(cache_key, verification_code, timeout=120)
@@ -36,7 +36,7 @@ class SendProCodeSerializer(serializers.Serializer):
         )
 
         sms_text = (
-            f"Ari mobil ilovasiga kirish uchun tasdiqlash kodi: {verification_code}. "
+            f"Ari mobil ilovasiga kirish uchun tasdiqlash kodi: {verification_code}\n"
             f"Kodni hech kimga bermang."
         )
         send_sms(phone_number, sms_text)

@@ -22,7 +22,7 @@ class SendVerificationCodeSerializer(serializers.Serializer):
     def validate(self, data):
         phone_number = data["phone_number"]
 
-        verification_code = str(random.randint(1000, 9999))
+        verification_code = str(random.randint(100000, 999999))
         cache_key = f"registration_wait_{phone_number}"
 
         # Cache + bazaga yozamiz
@@ -34,7 +34,7 @@ class SendVerificationCodeSerializer(serializers.Serializer):
 
         # Eskiz.uz orqali SMS yuboramiz
         sms_text = (
-            f"Ari mobil ilovasiga kirish uchun tasdiqlash kodi: {verification_code}. "
+            f"Ari mobil ilovasiga kirish uchun tasdiqlash kodi: {verification_code}\n"
             f"Kodni hech kimga bermang."
         )
         send_sms(phone_number, sms_text)
