@@ -74,13 +74,14 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
         profile = await sync_to_async(DeliverProfile.objects.select_related("user").get)(user_id=self.user_id)
         if not profile.work_active:
             return
+
         timestamp = localtime(now()).isoformat()
         timestampcount = int(time.time())
         redis_key = f"location:{self.user_id}"
         old_data_raw = r.get(redis_key)
         old_data = json.loads(old_data_raw) if old_data_raw else None
 
-        # Redis'ga yangi joylashuvni yozamiz
+        # Redis'ga joylashuvni yozish
         r.set(redis_key, json.dumps({
             "lat": lat,
             "lon": lon,
@@ -89,28 +90,31 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
             "timestamp": timestamp
         }), ex=10800)
 
-        # 1. Orderni topamiz
-        try:
-            order = await sync_to_async(
-                lambda: Order.objects.select_related("shop", "user")
-                .filter(deliver=profile, status="assigned", assigned_at__isnull=False)
-                .first()
-            )()
+        # Buyurtma borligini tekshiramiz
+        order = await sync_to_async(
+            lambda: Order.objects.select_related("shop", "user")
+            .filter(deliver=profile, status="assigned", assigned_at__isnull=False)
+            .first()
+        )()
 
-            active_location = await sync_to_async(Location.objects.filter(user=order.user, active=True).first)()
+        if not order:
+            return  # Order yo‘q — goo`ga hech narsa yubormaymiz
 
-
-        except Order.DoesNotExist:
+        # Agar order bor bo‘lsa davom etamiz
+        active_location = await sync_to_async(
+            lambda: Location.objects.filter(user=order.user, active=True).first()
+        )()
+        if not active_location:
             return
 
         goo_group = f"user_{order.user.id}_goo"
 
-        # 2. Avvalgi joylashuvdan uzoqlikni tekshiramiz (agar bor bo‘lsa)
+        # Uzoqlikni hisoblash
         distance_m = 1000
         if old_data:
             distance_m = self.haversine(lat, lon, old_data["lat"], old_data["lon"])
 
-        # 3. Har 5s da lat/lon yuboramiz
+        # Har 5s da lat/lon yuborish
         last_5s_key = f"loc_sent:{self.user_id}:5s"
         last_5s = r.get(last_5s_key)
         if not last_5s or (timestampcount - int(last_5s)) >= 5:
@@ -126,7 +130,7 @@ class OrderOfferConsumer(AsyncWebsocketConsumer):
             )
             r.set(last_5s_key, timestampcount)
 
-        # 4. Har 15s da agar >20m bo‘lsa, duration yuboramiz
+        # Har 15s da, agar >20m harakat bo‘lsa — duration yuborish
         last_15s_key = f"duration_sent:{self.user_id}"
         last_15s = r.get(last_15s_key)
         if (not last_15s or (timestampcount - int(last_15s)) >= 15) and distance_m >= 20:
