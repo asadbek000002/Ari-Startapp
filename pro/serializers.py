@@ -192,6 +192,7 @@ class OrderActiveProSerializer(serializers.ModelSerializer):
         location = obj.user.locations.filter(active=True).first()
         if location:
             return {
+                "id": location.id,
                 "latitude": location.coordinates.y,
                 "longitude": location.coordinates.x,
                 "address": location.address,
@@ -201,6 +202,7 @@ class OrderActiveProSerializer(serializers.ModelSerializer):
     def get_shop_location(self, obj):
         if obj.shop and obj.shop.coordinates:
             return {
+                "id": obj.shop.id,
                 "latitude": obj.shop.coordinates.y,
                 "longitude": obj.shop.coordinates.x,
                 "title": obj.shop.title,
@@ -212,6 +214,7 @@ class OrderActiveProSerializer(serializers.ModelSerializer):
             courier_loc = obj.deliver.deliver_locations.order_by('-updated_at').first()
             if courier_loc:
                 return {
+                    "id": courier_loc.id,
                     "latitude": courier_loc.coordinates.y,
                     "longitude": courier_loc.coordinates.x,
                     "updated_at": courier_loc.updated_at,
