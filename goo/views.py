@@ -405,3 +405,4 @@ class UserOrderHistoryView(ListAPIView):
 class OrderHistoryDetailView(RetrieveAPIView):
     queryset = Order.objects.select_related('shop', 'location').all()
     serializer_class = OrderHistoryDetailSerializer
+    permission_classes = [IsAuthenticated]
