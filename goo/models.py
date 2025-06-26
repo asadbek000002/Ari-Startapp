@@ -6,6 +6,8 @@ from pro.models import DeliverProfile
 from shop.models import Shop
 from django.utils import timezone
 
+from user.models import Location
+
 
 class Product(models.Model):
     """Mahsulot nomlari va foiz variantlarini saqlovchi model"""
@@ -45,6 +47,7 @@ class Order(models.Model):
         ("pro", "Courier"),  # Professional = Pro
         ("system", "System"),
     ]
+    location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True)
     order_code = models.CharField(max_length=30, unique=True, blank=True, null=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="orders")
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="orders")
@@ -59,6 +62,7 @@ class Order(models.Model):
     intercom_code = models.CharField(max_length=20, blank=True, null=True)
     additional_note = models.TextField(max_length=250, blank=True, null=True)
     item_price = models.PositiveIntegerField(null=True, blank=True)
+    total_price = models.PositiveIntegerField(null=True, blank=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
 
@@ -88,6 +92,8 @@ class Order(models.Model):
         return f"AR-{timestamp}-{random_digits}"
 
     def save(self, *args, **kwargs):
+        if not self.pk and not self.location:
+            self.location = self.user.locations.filter(active=True).first()
         if not self.order_code:
             for _ in range(5):  # 5 marta urinish
                 code = self.generate_order_code()

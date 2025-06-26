@@ -5,7 +5,7 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.generics import RetrieveAPIView, UpdateAPIView, CreateAPIView
+from rest_framework.generics import RetrieveAPIView, UpdateAPIView, CreateAPIView, ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
@@ -18,7 +18,8 @@ from goo.serializers import LocationSerializer, OrderSerializer, LocationUpdateS
     LocationActiveSerializer, UserUpdateSerializer, UserSerializer, ContactSerializer, OrderUpdateSerializer, \
     OrderActiveGooSerializer, CancelGooOrderSerializer, PendingSearchingAssignedOrderSerializer, \
     RetryUpdateOrderSerializer, \
-    OrderDetailSerializer, CompleteOrderSerializer, SendVerificationCodeSerializer, VerifyCodeSerializer
+    OrderDetailSerializer, CompleteOrderSerializer, SendVerificationCodeSerializer, VerifyCodeSerializer, \
+    OrderHistorySerializer, OrderHistoryDetailSerializer
 from user.models import Location
 
 from goo.tasks import send_order_to_couriers
@@ -390,3 +391,17 @@ def complete_order_by_customer(request, order_id):
         )
         return Response({'status': 'completed'}, status=200)
     return Response(serializer.errors, status=400)
+
+
+class UserOrderHistoryView(ListAPIView):
+    serializer_class = OrderHistorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user, status='completed', direction='handed_over').order_by('-created_at')
+
+
+
+class OrderHistoryDetailView(RetrieveAPIView):
+    queryset = Order.objects.select_related('shop', 'location').all()
+    serializer_class = OrderHistoryDetailSerializer

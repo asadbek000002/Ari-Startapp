@@ -4,7 +4,7 @@ from goo.views import list_locations, LocationCreateView, create_order, update_l
     detail_location, active_location, UserProfileView, UpdateUserView, LatestContactView, address_order, \
     retry_order_delivery, cancel_order_by_customer, CustomerOrderView, delete_location, PendingSearchingOrdersView, \
     update_and_retry_order, OrderDetailView, complete_order_by_customer, AssignedOrdersView, SendVerificationCodeView, \
-    VerifyCodeAndLoginView
+    VerifyCodeAndLoginView, UserOrderHistoryView, OrderHistoryDetailView
 
 urlpatterns = [
     # path('register/', GooRegistrationView.as_view(), name='goo-register'),
@@ -39,5 +39,7 @@ urlpatterns = [
 
     path('orders/pending-searching/', PendingSearchingOrdersView.as_view(), name='pending_searching_orders'),
     path('orders/assigned/', AssignedOrdersView.as_view(), name='assigned-orders'),
+    path("orders/history/", UserOrderHistoryView.as_view(), name="user-order-history"),
+    path("orders/history/<int:pk>/", OrderHistoryDetailView.as_view(), name="user-order-history-detail"),
 
 ]

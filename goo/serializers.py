@@ -435,3 +435,42 @@ class CompleteOrderSerializer(serializers.Serializer):
                 update_user_rating(order.deliver.user)
 
         return order
+
+
+class OrderHistorySerializer(serializers.ModelSerializer):
+    shop_title = serializers.CharField(source="shop.title")
+
+    class Meta:
+        model = Order
+        fields = ["id", "shop_title", "item_price", "created_at"]
+
+
+class OrderHistoryDetailSerializer(serializers.ModelSerializer):
+    shop_id = serializers.IntegerField(source='shop.id', read_only=True)
+    shop_title = serializers.CharField(source='shop.title', read_only=True)
+    shop_image = serializers.SerializerMethodField()
+    user_location_address = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = [
+            'item_price',
+            'delivery_price',
+            'total_price',
+            'created_at',
+            'shop_id',
+            'shop_title',
+            'shop_image',
+            'user_location_address',
+        ]
+
+    def get_user_location_address(self, obj):
+        if obj.location:
+            return obj.location.address
+        return "Location not recorded"
+
+    def get_shop_image(self, obj):
+        request = self.context.get('request')
+        if obj.shop.image and request:
+            return request.build_absolute_uri(obj.shop.image.url)
+        return None
