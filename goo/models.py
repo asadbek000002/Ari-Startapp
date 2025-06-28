@@ -61,8 +61,8 @@ class Order(models.Model):
     has_intercom = models.BooleanField(default=False)  # kerak emas
     intercom_code = models.CharField(max_length=20, blank=True, null=True)
     additional_note = models.TextField(max_length=250, blank=True, null=True)
-    item_price = models.PositiveIntegerField(null=True, blank=True)
-    total_price = models.PositiveIntegerField(null=True, blank=True)
+    item_price = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    total_price = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
 
@@ -82,7 +82,7 @@ class Order(models.Model):
     delivered_at = models.DateTimeField(null=True, blank=True)
 
     weather_condition = models.CharField(max_length=255, null=True, blank=True)
-    delivery_price = models.PositiveIntegerField(null=True, blank=True)
+    delivery_price = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
 
     picked_up_at = models.DateTimeField(null=True, blank=True)
 
@@ -134,3 +134,13 @@ class Contact(models.Model):
 
     def __str__(self):
         return self.phone_number if self.phone_number else "Noma'lum"
+
+
+class Check(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="checks")
+    image = models.ImageField(upload_to='checks/')
+    qr_url = models.URLField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Check for Order {self.order.id}"

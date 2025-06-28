@@ -2,7 +2,8 @@ from django.urls import path
 # ProRegistrationView
 from pro.views import DeliverHomeView, DeliverProfileView, ToggleDeliverActiveView, \
     DeliverOrderView, CourierOrderDirectionUpdateView, cancel_order_by_courier, complete_order_by_courier, \
-    AssignedOrdersProView, DeliverActiveOrderView, SendProVerificationCodeView, VerifyProCodeLoginView
+    AssignedOrdersProView, DeliverActiveOrderView, SendProVerificationCodeView, VerifyProCodeLoginView, UploadCheckView, \
+    UploadManualCheckView
 
 urlpatterns = [
     # path('register/', ProRegistrationView.as_view(), name='pro_register'),
@@ -20,5 +21,7 @@ urlpatterns = [
     path('orders/assigned/', AssignedOrdersProView.as_view(), name='assigned_orders'),
     path('order/<int:order_id>/direction/', CourierOrderDirectionUpdateView.as_view()),
     path('order/<int:order_id>/feedback/', complete_order_by_courier, name='cancel_order_pro'),
+    path('checks/upload/', UploadCheckView.as_view(), name='upload-check'),
+    path('manual-checks/upload/', UploadManualCheckView.as_view(), name='upload-check'),
 
 ]

@@ -11,10 +11,12 @@ from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from pro.serializers import DeliverHomeSerializer, DeliverProfileSerializer, \
     OrderActiveProSerializer, CancelProOrderSerializer, CourierCompleteOrderSerializer, AssignedOrderProSerializer, \
-    SendProCodeSerializer, VerifyProCodeSerializer
+    SendProCodeSerializer, VerifyProCodeSerializer, CheckSerializer
 from .models import DeliverProfile
-from goo.models import Order
+from goo.models import Order, Check
 from django.utils import timezone
+from pyzbar.pyzbar import decode
+from PIL import Image
 
 User = get_user_model()
 
@@ -298,3 +300,158 @@ class AssignedOrdersProView(APIView):
 
         serializer = AssignedOrderProSerializer(orders, many=True)
         return Response(serializer.data)
+
+
+from bs4 import BeautifulSoup
+import requests
+from decimal import Decimal
+
+
+class UploadCheckView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        image_file = request.FILES.get("image")
+        order_id = request.data.get("order")
+
+        if not image_file or not order_id:
+            return Response(
+                {"detail": "Image va order ID kerak."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # QR dan URL olish
+            image = Image.open(image_file)
+            decoded = decode(image)
+            if not decoded:
+                return Response(
+                    {"detail": "QR kod topilmadi."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            qr_data = decoded[0].data.decode("utf-8")
+
+            # HTML sahifani olish
+
+            response = requests.get(qr_data, timeout=1.5)
+            if response.status_code != 200:
+                return Response(
+                    {"detail": "QR URL orqali sahifa topilmadi."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            price_tag = soup.find("td", class_="price-sum")
+
+            if not price_tag:
+                return Response(
+                    {"detail": "Narx topilmadi."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            raw_price = price_tag.text.strip().replace(",", "")
+            try:
+                price = Decimal(raw_price)
+            except Exception:
+                return Response(
+                    {"detail": f"Narxni Decimal ga aylantirib bo‘lmadi: '{raw_price}'"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Orderni yangilash
+            try:
+                order = Order.objects.get(id=order_id)
+            except Order.DoesNotExist:
+                return Response(
+                    {"detail": "Order topilmadi."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            order.item_price = price
+            order.total_price = price + order.delivery_price
+            order.save()
+
+            # Check yaratish
+            check = Check.objects.create(
+                order=order,
+                image=image_file,
+                qr_url=qr_data
+            )
+            channel_layer = get_channel_layer()
+            group_name = f"user_{order.user_id}_goo"
+
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {
+                    "type": "send_notification",
+                    "message": {
+                        "type": "item_price",
+                        "order_id": order.id,
+                        "item_price": str(order.item_price)
+                    }
+                }
+            )
+
+            serializer = CheckSerializer(check, context={"request": request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response(
+                {"detail": f"Ichki xatolik: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class UploadManualCheckView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        image_file = request.FILES.get("image")
+        order_id = request.data.get("order")
+        price = request.data.get("price")
+
+        if not image_file or not order_id or not price:
+            return Response({"detail": "Image, order ID va narx kerak."}, status=400)
+
+        try:
+            order = Order.objects.get(id=order_id)
+
+            try:
+                # Narxdan vergul va probellarni tozalab float ga aylantiramiz
+                cleaned_price = str(price).replace(",", "").strip()
+                order.item_price = Decimal(cleaned_price)
+                order.total_price = Decimal(cleaned_price) + order.delivery_price
+                order.save()
+            except ValueError:
+                return Response({"detail": f"Narx noto‘g‘ri formatda: '{price}'"}, status=400)
+
+            # QRsiz check yoziladi
+            check = Check.objects.create(
+                order=order,
+                image=image_file,
+                qr_url=None  # QR kodi yo‘q
+            )
+
+            channel_layer = get_channel_layer()
+            group_name = f"user_{order.user_id}_goo"
+
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {
+                    "type": "send_notification",
+                    "message": {
+                        "type": "item_price",
+                        "order_id": order.id,
+                        "item_price": str(order.item_price)
+                    }
+                }
+            )
+
+            serializer = CheckSerializer(check, context={"request": request})
+            return Response(serializer.data, status=201)
+
+        except Order.DoesNotExist:
+            return Response({"detail": "Order topilmadi."}, status=404)
+        except Exception as e:
+            return Response({"detail": f"Xatolik: {str(e)}"}, status=500)

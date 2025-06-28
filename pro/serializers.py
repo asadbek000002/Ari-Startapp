@@ -3,7 +3,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from rest_framework import serializers
 
-from goo.models import Order, Feedback
+from goo.models import Order, Feedback, Check
 from goo.utils import update_user_rating
 from user.models import UserRole, VerificationCode
 from django.contrib.auth import get_user_model
@@ -277,3 +277,10 @@ class AssignedOrderProSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ['id', 'order_code', 'shop_title', 'shop_id', 'items', 'created_at', 'status']
+
+
+class CheckSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Check
+        fields = ['id', 'order', 'image', 'qr_url', 'uploaded_at']
+        read_only_fields = ['qr_url', 'uploaded_at']

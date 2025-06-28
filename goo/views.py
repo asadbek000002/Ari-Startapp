@@ -286,6 +286,7 @@ class CustomerOrderView(APIView):
             .order_by('-assigned_at')
             .only(
                 'id', 'delivery_price',
+                'item_price', 'total_price',
                 'assigned_at',
                 'direction',
                 'delivery_duration_min',

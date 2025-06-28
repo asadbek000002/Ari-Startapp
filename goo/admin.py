@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
-from .models import Order, Contact, Product, Feedback
+from .models import Order, Contact, Product, Feedback, Check
 
 
 class OrderAdmin(admin.ModelAdmin):
@@ -15,3 +15,4 @@ admin.site.register(Order, OrderAdmin)
 admin.site.register(Contact, ContactAdmin)
 admin.site.register(Product)
 admin.site.register(Feedback)
+admin.site.register(Check)
