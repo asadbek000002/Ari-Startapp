@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
     gdal-bin \
-    libgdal-dev
+    libgdal-dev \
+    libzbar0
 
 # Force GDAL to be version 3.2.2
 RUN pip install --no-cache-dir GDAL==3.2.2.1
