@@ -399,7 +399,7 @@ class UserOrderHistoryView(ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Order.objects.filter(user=self.request.user, status='completed', direction='handed_over').order_by('-created_at')
+        return Order.objects.filter(user=self.request.user, status='completed').order_by('-created_at')
 
 
 
