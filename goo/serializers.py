@@ -357,7 +357,7 @@ class ShopSerializer(serializers.ModelSerializer):
 class OrderLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
-        fields = ['address', 'coordinates']
+        fields = ['id', 'address', 'coordinates']
 
 
 class OrderUserSerializer(serializers.ModelSerializer):
