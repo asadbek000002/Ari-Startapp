@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from rest_framework.decorators import permission_classes, api_view
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.views import APIView
 from rest_framework import status, generics
 from rest_framework.response import Response
@@ -11,7 +12,8 @@ from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from pro.serializers import DeliverHomeSerializer, DeliverProfileSerializer, \
     OrderActiveProSerializer, CancelProOrderSerializer, CourierCompleteOrderSerializer, AssignedOrderProSerializer, \
-    SendProCodeSerializer, VerifyProCodeSerializer, CheckSerializer
+    SendProCodeSerializer, VerifyProCodeSerializer, CheckSerializer, OrderHistoryProSerializer, \
+    OrderHistoryProDetailSerializer
 from .models import DeliverProfile
 from goo.models import Order, Check
 from django.utils import timezone
@@ -311,30 +313,19 @@ class UploadCheckView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        image_file = request.FILES.get("image")
-        order_id = request.data.get("order")
+        qr_url = request.data.get("qr_url")  # Endi URL to‘g‘ridan-to‘g‘ri kelyapti
+        order = request.data.get("order")
+        image = request.FILES.get("image")  # Agar sizda rasm ham kelsa saqlab qolamiz
 
-        if not image_file or not order_id:
+        if not qr_url or not order:
             return Response(
-                {"detail": "Image va order ID kerak."},
+                {"detail": "QR URL va order ID kerak."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            # QR dan URL olish
-            image = Image.open(image_file)
-            decoded = decode(image)
-            if not decoded:
-                return Response(
-                    {"detail": "QR kod topilmadi."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            qr_data = decoded[0].data.decode("utf-8")
-
             # HTML sahifani olish
-
-            response = requests.get(qr_data, timeout=1.5)
+            response = requests.get(qr_url, timeout=1.5)
             if response.status_code != 200:
                 return Response(
                     {"detail": "QR URL orqali sahifa topilmadi."},
@@ -342,7 +333,14 @@ class UploadCheckView(APIView):
                 )
 
             soup = BeautifulSoup(response.text, "html.parser")
-            price_tag = soup.find("td", class_="price-sum")
+            total_label = soup.find("td", string=lambda s: s and "Jami to`lov:" in s)
+            if total_label and total_label.find_next_sibling("td"):
+                price_tag = total_label.find_next_sibling("td")
+            else:
+                return Response(
+                    {"detail": "Yakuniy to‘lov (chegirmadan keyin) topilmadi."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             if not price_tag:
                 return Response(
@@ -361,7 +359,7 @@ class UploadCheckView(APIView):
 
             # Orderni yangilash
             try:
-                order = Order.objects.get(id=order_id)
+                order = Order.objects.get(id=order)
             except Order.DoesNotExist:
                 return Response(
                     {"detail": "Order topilmadi."},
@@ -375,8 +373,8 @@ class UploadCheckView(APIView):
             # Check yaratish
             check = Check.objects.create(
                 order=order,
-                image=image_file,
-                qr_url=qr_data
+                image=image,
+                qr_url=qr_url
             )
             channel_layer = get_channel_layer()
             group_name = f"user_{order.user_id}_goo"
@@ -455,3 +453,21 @@ class UploadManualCheckView(APIView):
             return Response({"detail": "Order topilmadi."}, status=404)
         except Exception as e:
             return Response({"detail": f"Xatolik: {str(e)}"}, status=500)
+
+
+class ProOrderHistoryView(ListAPIView):
+    serializer_class = OrderHistoryProSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        try:
+            deliver_profile = DeliverProfile.objects.get(user=self.request.user)
+        except DeliverProfile.DoesNotExist:
+            return Order.objects.none()  # Hech nima qaytmaydi
+        return Order.objects.filter(deliver=deliver_profile, status='completed').order_by('-created_at')
+
+
+class OrderHistoryProDetailView(RetrieveAPIView):
+    queryset = Order.objects.select_related('shop').all()
+    serializer_class = OrderHistoryProDetailSerializer
+    permission_classes = [IsAuthenticated]

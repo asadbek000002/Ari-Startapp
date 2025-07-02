@@ -284,3 +284,35 @@ class CheckSerializer(serializers.ModelSerializer):
         model = Check
         fields = ['id', 'order', 'image', 'qr_url', 'uploaded_at']
         read_only_fields = ['qr_url', 'uploaded_at']
+
+
+class OrderHistoryProSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Order
+        fields = ['id', 'order_code', 'created_at', 'status']
+
+
+class OrderHistoryProDetailSerializer(serializers.ModelSerializer):
+    shop_id = serializers.IntegerField(source='shop.id', read_only=True)
+    shop_title = serializers.CharField(source='shop.title', read_only=True)
+    shop_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = [
+            'total_price',
+            'item_price',
+            'delivery_price',
+            'order_code',
+            'created_at',
+            'shop_id',
+            'shop_title',
+            'shop_image',
+        ]
+
+    def get_shop_image(self, obj):
+        request = self.context.get('request')
+        if obj.shop.image and request:
+            return request.build_absolute_uri(obj.shop.image.url)
+        return None

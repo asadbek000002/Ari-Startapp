@@ -175,7 +175,7 @@ class LocationUpdateSerializer(serializers.ModelSerializer):
 class LocationActiveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
-        fields = ['custom_name', 'address']
+        fields = ['id', 'custom_name', 'address']
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
