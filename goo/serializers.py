@@ -293,7 +293,9 @@ class OrderActiveGooSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id',
+            'item_price',
             'delivery_price',
+            'total_price',
             'assigned_at',
             'direction',
             'delivery_duration_min',

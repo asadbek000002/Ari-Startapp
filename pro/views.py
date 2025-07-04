@@ -384,9 +384,11 @@ class UploadCheckView(APIView):
                 {
                     "type": "send_notification",
                     "message": {
-                        "type": "item_price",
+                        "type": "order_price",
                         "order_id": order.id,
-                        "item_price": str(order.item_price)
+                        "delivery_price": str(order.delivery_price),
+                        "item_price": str(order.item_price),
+                        "total_price": str(order.total_price)
                     }
                 }
             )
@@ -439,9 +441,11 @@ class UploadManualCheckView(APIView):
                 {
                     "type": "send_notification",
                     "message": {
-                        "type": "item_price",
+                        "type": "order_price",
                         "order_id": order.id,
-                        "item_price": str(order.item_price)
+                        "delivery_price": str(order.delivery_price),
+                        "item_price": str(order.item_price),
+                        "total_price": str(order.total_price)
                     }
                 }
             )
