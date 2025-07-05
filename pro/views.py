@@ -17,6 +17,9 @@ from pro.serializers import DeliverHomeSerializer, DeliverProfileSerializer, \
 from .models import DeliverProfile
 from goo.models import Order, Check
 from django.utils import timezone
+from datetime import datetime, timedelta, time
+from django.utils.timezone import now, make_aware
+from django.db.models import Sum
 from pyzbar.pyzbar import decode
 from PIL import Image
 
@@ -475,3 +478,41 @@ class OrderHistoryProDetailView(RetrieveAPIView):
     queryset = Order.objects.select_related('shop').all()
     serializer_class = OrderHistoryProDetailSerializer
     permission_classes = [IsAuthenticated]
+
+
+def get_last_sunday_noon():
+    today = now().date()
+    # Yakshanba haftaning 6-kuni bo‘ladi (0 = Dushanba, 6 = Yakshanba)
+    days_since_sunday = (today.weekday() + 1) % 7  # Yakshanba uchun 0
+    last_sunday = today - timedelta(days=days_since_sunday)
+    last_sunday_noon = make_aware(datetime.combine(last_sunday, time(hour=12)))
+    return last_sunday_noon
+
+
+class WeeklyEarningsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            profile = DeliverProfile.objects.get(user=request.user)
+        except DeliverProfile.DoesNotExist:
+            return Response({"detail": "DeliverProfile not found."}, status=404)
+
+        from_time = get_last_sunday_noon()
+
+        orders = Order.objects.filter(
+            deliver=profile,
+            status="completed",
+            delivered_at__gte=from_time
+        )
+
+        totals = orders.aggregate(
+            total_price_sum=Sum("total_price"),
+            delivery_price_sum=Sum("delivery_price")
+        )
+
+        return Response({
+            "since": from_time.isoformat(),
+            "total_price": totals["total_price_sum"] or 0,
+            "delivery_price": totals["delivery_price_sum"] or 0
+        })

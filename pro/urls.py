@@ -3,7 +3,7 @@ from django.urls import path
 from pro.views import DeliverHomeView, DeliverProfileView, ToggleDeliverActiveView, \
     DeliverOrderView, CourierOrderDirectionUpdateView, cancel_order_by_courier, complete_order_by_courier, \
     AssignedOrdersProView, DeliverActiveOrderView, SendProVerificationCodeView, VerifyProCodeLoginView, UploadCheckView, \
-    UploadManualCheckView, ProOrderHistoryView, OrderHistoryProDetailView
+    UploadManualCheckView, ProOrderHistoryView, OrderHistoryProDetailView, WeeklyEarningsView
 
 urlpatterns = [
     # path('register/', ProRegistrationView.as_view(), name='pro_register'),
@@ -25,5 +25,5 @@ urlpatterns = [
     path('manual-checks/upload/', UploadManualCheckView.as_view(), name='upload-check'),
     path('orders/history/', ProOrderHistoryView.as_view(), name='history-order-pro'),
     path('orders/history/<int:pk>/', OrderHistoryProDetailView.as_view(), name='history-order-pro-detail'),
-
+    path("courier/weekly-earnings/", WeeklyEarningsView.as_view(), name="weekly-earnings"),
 ]
