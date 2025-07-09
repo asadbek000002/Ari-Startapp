@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from goo.models import Order, Feedback, Check
 from goo.utils import update_user_rating
+from shop.models import Shop
 from user.models import UserRole, VerificationCode
 from django.contrib.auth import get_user_model
 from pro.models import DeliverProfile
@@ -287,7 +288,6 @@ class CheckSerializer(serializers.ModelSerializer):
 
 
 class OrderHistoryProSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Order
         fields = ['id', 'order_code', 'created_at', 'status']
@@ -316,3 +316,26 @@ class OrderHistoryProDetailSerializer(serializers.ModelSerializer):
         if obj.shop.image and request:
             return request.build_absolute_uri(obj.shop.image.url)
         return None
+
+
+class ShopSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shop
+        fields = ['title', 'image']  # image maydoni shu yerda
+
+
+class OrderProDetailSerializer(serializers.ModelSerializer):
+    shop = ShopSerializer(read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            "items",
+            "allow_other_shops",
+            "house_number",
+            "apartment_number",
+            "floor",
+            "intercom_code",
+            "additional_note",
+            "shop",
+        ]

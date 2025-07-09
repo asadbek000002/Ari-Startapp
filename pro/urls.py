@@ -3,7 +3,7 @@ from django.urls import path
 from pro.views import DeliverHomeView, DeliverProfileView, ToggleDeliverActiveView, \
     DeliverOrderView, CourierOrderDirectionUpdateView, cancel_order_by_courier, complete_order_by_courier, \
     AssignedOrdersProView, DeliverActiveOrderView, SendProVerificationCodeView, VerifyProCodeLoginView, UploadCheckView, \
-    UploadManualCheckView, ProOrderHistoryView, OrderHistoryProDetailView, WeeklyEarningsView
+    UploadManualCheckView, ProOrderHistoryView, OrderHistoryProDetailView, WeeklyEarningsView, OrderProDetailView
 
 urlpatterns = [
     # path('register/', ProRegistrationView.as_view(), name='pro_register'),
@@ -16,9 +16,10 @@ urlpatterns = [
 
     path('order/<int:order_id>/cancel/', cancel_order_by_courier, name='cancel_order_pro'),
 
-    path('active/orders/<int:id>/', DeliverOrderView.as_view(), name='courier_orders'),
-    path('active/orders/', DeliverActiveOrderView.as_view(), name='courier_orders'),
-    path('orders/assigned/', AssignedOrdersProView.as_view(), name='assigned_orders'),
+    path('active/orders/<int:id>/', DeliverOrderView.as_view(), name='courier_orders'), #Listdan otish
+    path('active/orders/', DeliverActiveOrderView.as_view(), name='courier_orders'), # active order tugmasidan otish
+    path('orders/assigned/', AssignedOrdersProView.as_view(), name='assigned_orders'), # bu active list
+    path('orders/<int:pk>/', OrderProDetailView.as_view(), name='assigned_orders'), # bu active list
     path('order/<int:order_id>/direction/', CourierOrderDirectionUpdateView.as_view()),
     path('order/<int:order_id>/feedback/', complete_order_by_courier, name='cancel_order_pro'),
     path('checks/upload/', UploadCheckView.as_view(), name='upload-check'),

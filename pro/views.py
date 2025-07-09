@@ -13,7 +13,7 @@ from django.contrib.auth import get_user_model
 from pro.serializers import DeliverHomeSerializer, DeliverProfileSerializer, \
     OrderActiveProSerializer, CancelProOrderSerializer, CourierCompleteOrderSerializer, AssignedOrderProSerializer, \
     SendProCodeSerializer, VerifyProCodeSerializer, CheckSerializer, OrderHistoryProSerializer, \
-    OrderHistoryProDetailSerializer
+    OrderHistoryProDetailSerializer, OrderProDetailSerializer
 from .models import DeliverProfile
 from goo.models import Order, Check
 from django.utils import timezone
@@ -516,3 +516,17 @@ class WeeklyEarningsView(APIView):
             "total_price": totals["total_price_sum"] or 0,
             "delivery_price": totals["delivery_price_sum"] or 0
         })
+
+
+class OrderProDetailView(RetrieveAPIView):
+    serializer_class = OrderProDetailSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "pk"
+
+    def get_queryset(self):
+        return (
+            Order.objects
+            .select_related('shop')
+            .filter(deliver__user=self.request.user,
+                    status__in=["pending", "searching", "assigned"])
+        )
