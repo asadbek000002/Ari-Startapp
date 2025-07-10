@@ -318,14 +318,14 @@ class OrderHistoryProDetailSerializer(serializers.ModelSerializer):
         return None
 
 
-class ShopSerializer(serializers.ModelSerializer):
+class ShopProSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
         fields = ['title', 'image']  # image maydoni shu yerda
 
 
 class OrderProDetailSerializer(serializers.ModelSerializer):
-    shop = ShopSerializer(read_only=True)
+    shop = ShopProSerializer(read_only=True)
 
     class Meta:
         model = Order
