@@ -25,6 +25,8 @@ from user.models import Location
 
 # Redis connection
 # r = redis.StrictRedis(host='localhost', port=6377, db=0)
+
+
 r = redis.StrictRedis(host='redis', port=6379, db=0)
 
 
@@ -281,6 +283,17 @@ def assign_order_to_courier(order, deliver_user_id, deliver_locations=None):
         order.delivery_price = price
         order.assigned_at = timezone.now()
         order.save()
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"user_{deliver_user_id}_pro",
+            {
+                "type": "send_notification",
+                "message": {
+                    "type": "order.assigned",
+                    "order_id": str(order.id),
+                }
+            }
+        )
         # if price:
         #     print("Masofa (km):", distance_km)
         #     print("Vaqt (min):", duration_min)
@@ -410,6 +423,7 @@ def send_order_status_to_customer(channel_layer, order, failed=False):
                 "message": order_data
             }
         )
+
 
 def calculate_order_route_info(deliver_coords, shop_coords, customer_coords, deliver_role, direction=None):
     """
