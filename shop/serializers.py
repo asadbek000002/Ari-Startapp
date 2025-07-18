@@ -4,7 +4,8 @@ import random
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
 
-from shop.models import Shop, ShopRole, Advertising
+from shop.models import Shop, ShopRole, Advertising, ShopFeedback
+from shop.utils import update_shop_rating
 from user.models import UserRole, VerificationCode
 
 User = get_user_model()
@@ -149,15 +150,27 @@ class ShopMapListSerializer(serializers.ModelSerializer):
         return getattr(obj.role, f"name_{lang}", obj.role.name_uz) if obj.role else None  # Default: role.name_uz
 
 
+class ShopFeedbackSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ShopFeedback
+        fields = ['id', 'user', 'rating', 'comment', 'created_at']
+
+    def get_user(self, obj):
+        return obj.user.full_name  # user modelingizda full_name maydon bor deb faraz qilaman
+
+
 class ShopDetailSerializer(serializers.ModelSerializer):
     title = serializers.SerializerMethodField()
     about = serializers.SerializerMethodField()
     locations = serializers.SerializerMethodField()
+    feedbacks = ShopFeedbackSerializer(many=True, read_only=True)
 
     class Meta:
         model = Shop
         fields = ["id", "image", "title", "work_start", "work_end", "phone_number", "rating", "about",
-                  "coordinates", "is_active", "role", "locations"]
+                  "coordinates", "is_active", "role", "locations", "feedbacks"]
 
     def get_title(self, obj):
         lang = get_language()
@@ -187,3 +200,30 @@ class AdvertisingSerializer(serializers.ModelSerializer):
     def get_text(self, obj):
         lang = get_language()
         return getattr(obj, f"text_{lang}", obj.text_uz)
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShopFeedback
+        fields = ['id', 'user', 'rating', 'comment', 'created_at']
+        read_only_fields = ['id', 'created_at', 'user']
+
+    def validate(self, data):
+        if not data.get('rating') and not data.get('comment'):
+            raise serializers.ValidationError("Kamida reyting yoki fikr yozilishi shart.")
+        return data
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        shop_id = self.context['view'].kwargs.get('shop_id')
+        shop = Shop.objects.get(pk=shop_id)
+
+        feedback, created = ShopFeedback.objects.update_or_create(
+            user=user,
+            shop=shop,
+            defaults={
+                'rating': validated_data.get('rating'),
+                'comment': validated_data.get('comment')
+            }
+        )
+        update_shop_rating(shop)
+        return feedback

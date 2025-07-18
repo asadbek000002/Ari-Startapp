@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.gis.db import models as gis_models
 import os
@@ -79,3 +80,21 @@ class Advertising(models.Model):
 
     def __str__(self):
         return self.title if self.title else "Noma'lum"
+
+
+class ShopFeedback(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shop_feedbacks'
+    )
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='feedbacks')
+    rating = models.PositiveSmallIntegerField(null=True, blank=True)  # Endi reyting ixtiyoriy
+    comment = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        # Kamida reyting yoki comment bo‘lishi kerak
+        if not self.rating and not self.comment:
+            raise ValidationError("Kamida reyting yoki fikr yozilishi shart.")
+
+    def __str__(self):
+        return f"Feedback by {self.user} for {self.shop} - Rating: {self.rating}"

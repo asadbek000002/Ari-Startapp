@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Shop, ShopRole, Sale, Advertising
+from .models import Shop, ShopRole, Sale, Advertising, ShopFeedback
 from django import forms
 
 from .tasks import schedule_shop_tasks
@@ -47,3 +47,5 @@ class AdvertisingAdmin(admin.ModelAdmin):
     list_display = ("title",)
     exclude = ('title', 'text')
 
+
+admin.site.register(ShopFeedback)

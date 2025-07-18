@@ -6,15 +6,15 @@ from django.contrib.auth import get_user_model
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.generics import CreateAPIView
+from rest_framework.generics import CreateAPIView, get_object_or_404
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 
-from shop.models import Shop, ShopRole, Advertising
+from shop.models import Shop, ShopRole, Advertising, ShopFeedback
 from user.models import Location
 from shop.serializers import (ShopFeaturedSerializer, ShopListSerializer, ShopMapListSerializer,
                               ShopDetailSerializer, ShopRoleSerializer, ShopRegistrationSerializer,
-                              AdvertisingSerializer)
+                              AdvertisingSerializer, FeedbackSerializer)
 
 User = get_user_model()
 
@@ -159,3 +159,15 @@ def advertising_list(request):
         return Response(serializer.data)
     except Advertising.DoesNotExist:
         return Response({"error": "Advertising not found"}, status=404)
+
+
+class SHopFeedbackCreateView(CreateAPIView):
+    queryset = ShopFeedback.objects.all()
+    serializer_class = FeedbackSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        shop_id = self.kwargs.get('shop_id')
+        shop = get_object_or_404(Shop, pk=shop_id)
+        serializer.save(user=self.request.user, shop=shop)
+
